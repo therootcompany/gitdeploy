@@ -1,0 +1,77 @@
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>configure cdadmin</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/bootstrap@4.1.0/dist/css/bootstrap.min.css"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <div class="container">
+        <div class="header">
+          <h1>cdadmin</h1>
+          <p>
+            <a href="status.html">Status</a>
+            <a href="merge.html">Merge</a>
+            <a href="configure.html">Configure</a>
+          </p>
+          <h2>Configure</h2>
+        </div>
+        <pre>{{configuration}}</pre>
+        <vue-form-generator
+          :schema="schema"
+          :model="configuration"
+        ></vue-form-generator>
+        <button class="btn btn-primary">Save</button>
+      </div>
+    </div>
+    <script src="https://unpkg.com/vue@2.6.12/dist/vue.js"></script>
+    <script src="https://unpkg.com/vue-form-generator@2.3.4/dist/vfg.js"></script>
+    <script src="https://unpkg.com/axios@0.20.0/dist/axios.min.js"></script>
+    <script>
+      new Vue({
+        el: '.app',
+        components: {
+          'vue-form-generator': VueFormGenerator.component
+        },
+        data: {
+          configuration: {
+            repository: '',
+            production: '',
+            staging: ''
+          },
+          schema: {
+            fields: [
+              {
+                type: 'input',
+                inputType: 'text',
+                label: 'Repository',
+                model: 'repository',
+                required: true
+              },
+              {
+                type: 'input',
+                inputType: 'text',
+                label: 'Production Branch',
+                model: 'production',
+                required: true
+              },
+              {
+                type: 'input',
+                inputType: 'text',
+                label: 'Staging Branch',
+                model: 'staging',
+                required: true
+              }
+            ]
+          },
+          formOptions: {}
+        }
+      });
+    </script>
+  </body>
+</html>

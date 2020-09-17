@@ -1,7 +1,0 @@
-baseURL = "http://example.org/"
-languageCode = "en-us"
-title = "cdadmin"
-disableKinds = ["RSS"]
-
-[permalinks]
-  pages = "/:filename/"
