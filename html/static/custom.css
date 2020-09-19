@@ -1,0 +1,21 @@
+html,
+body,
+.footer {
+  background-color: #ecf0f3;
+}
+.footer p {
+  display: inline-block;
+  font-size: 0.75rem;
+  line-height: 2rem;
+}
+.header {
+  background-color: #ffffff;
+  padding-top: 0.75rem;
+  padding-bottom: 0.5rem;
+  margin-bottom: 2rem;
+}
+.horizontal-overflow-scroll {
+  overflow-y: scroll;
+}
+/* .horizontal-overflow-scroll pre {
+} */

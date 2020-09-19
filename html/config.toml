@@ -1,0 +1,8 @@
+baseURL = "/"
+languageCode = "en-us"
+title = "cdadmin"
+theme = "Arc"
+disableKinds = ["RSS"]
+
+[permalinks]
+  pages = "/:filename"

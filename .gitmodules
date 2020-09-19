@@ -1,0 +1,3 @@
+[submodule "html/themes/arc"]
+	path = html/themes/arc
+	url = https://git.ryanburnette.com/ryanburnette/arc
