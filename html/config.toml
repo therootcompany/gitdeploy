@@ -1,6 +1,6 @@
 baseURL = "/"
 languageCode = "en-us"
-title = "cdadmin"
+title = "git-deploy"
 theme = "Arc"
 disableKinds = ["RSS"]
 
