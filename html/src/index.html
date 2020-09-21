@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>git-deploy Dashboard</title>
+    <link rel="stylesheet" href="style.css" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;1,400&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="app">
+      <div class="main">
+        <router-view name="header" :user="user"></router-view>
+        <router-view name="main" :user="user"></router-view>
+      </div>
+      <div class="x-footer">
+        <div class="container is-fluid">
+          <div class="columns">
+            <div class="column x-l">
+              <p>
+                <a
+                  href="https://git.ryanburnette.com/ryanburnette/git-deploy"
+                  target="_blank"
+                >
+                  git-deploy
+                </a>
+                v0.1.0
+              </p>
+            </div>
+            <div class="column x-r">
+              <p>
+                <button v-if="signedIn" class="button is-small">
+                  Sign Out
+                </button>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- <script src="/vendor.js"></script> -->
+    <script src="/main.js"></script>
+  </body>
+</html>

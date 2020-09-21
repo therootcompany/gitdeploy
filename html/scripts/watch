@@ -1,0 +1,33 @@
+#!/usr/bin/env node
+'use strict';
+
+var fs = require('fs');
+var { exec } = require('child_process');
+
+var cmd = `rsync -av --exclude="**.js" --exclude="css/" --exclude="js/" src/ dist/`;
+fs.watch(
+  'src',
+  {
+    recursive: true
+  },
+  function (eventType, filename) {
+    //console.log(eventType, filename);
+    if (filename.includes('.html')) {
+      rsync();
+    }
+  }
+);
+
+function rsync() {
+  exec(
+    cmd,
+    {
+      path: process.env.PATH,
+      cwd: process.cwd()
+    },
+    function (err, stdout, stderr) {
+      console.log(stdout);
+    }
+  );
+}
+rsync();

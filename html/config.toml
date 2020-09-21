@@ -1,8 +1,0 @@
-baseURL = "/"
-languageCode = "en-us"
-title = "git-deploy"
-theme = "Arc"
-disableKinds = ["RSS"]
-
-[permalinks]
-  pages = "/:filename"
