@@ -31,20 +31,23 @@ components.signin = Vue.component('signin', function (resolve, reject) {
           window.localStorage.setItem('token', _this.email);
         }
       },
+      beforeMount: function () {
+        console.log('beforeMount signin');
+      },
       mounted: function () {
-        var _this = this;
-        var token = window.localStorage.getItem('token');
-        if (token) {
-          getMe().then(function (result) {
-            if (result) {
-              router.push('/');
-            } else {
-              _this.state = 'signingIn';
-            }
-          });
-        } else {
-          _this.state = 'signingIn';
-        }
+        // var _this = this;
+        // var token = window.localStorage.getItem('token');
+        // if (token) {
+        //   getMe().then(function (result) {
+        //     if (result) {
+        //       router.push('/');
+        //     } else {
+        //       _this.state = 'signingIn';
+        //     }
+        //   });
+        // } else {
+        //   _this.state = 'signingIn';
+        // }
       }
     });
   });
