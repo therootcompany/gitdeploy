@@ -8,8 +8,8 @@ module.exports = {
   context: path.resolve(__dirname, 'src'),
   entry: {
     vendor: ['vue'],
-    main: {
-      import: './js/main.js',
+    app: {
+      import: './js/app.js',
       dependOn: 'vendor'
     }
   },
