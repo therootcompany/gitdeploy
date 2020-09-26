@@ -7,7 +7,7 @@ changes are pushed to a Git repository. This works with sites that are being
 edited in code and tracked in Git. Sites that have their content managed with a
 headless CMS that pushes to Git are also very well-suited.
 
-Github, Bitbucket, and Gitea are natively supported via webhooks.
+**git-deploy** supports verified webhooks from Github, Bitbucket, and Gitea.
 
 **git-deploy** is written in Go. This means that it's a standalone binary
 available on all major operating systems and architectures. It provides an API
