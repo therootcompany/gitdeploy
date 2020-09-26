@@ -7,7 +7,7 @@ var MiniCssExtractPlugin = require('mini-css-extract-plugin');
 module.exports = {
   context: path.resolve(__dirname, 'src'),
   entry: {
-    vendor: ['vue'],
+    vendor: ['vue', 'vue-router', 'axios'],
     app: {
       import: './js/app.js',
       dependOn: 'vendor'
