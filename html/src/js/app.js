@@ -11,7 +11,8 @@ Vue.use(VueRouter);
 var components = {
   signin: require('./components/signin.js'),
   navbar: require('./components/navbar.js'),
-  dashboard: require('./components/dashboard.js')
+  dashboard: require('./components/dashboard.js'),
+  notFound: require('./components/not-found.js')
 };
 
 var routes = [
@@ -26,6 +27,12 @@ var routes = [
     path: '/signin',
     components: {
       main: components.signin
+    }
+  },
+  {
+    path: '*',
+    components: {
+      main: components.notFound
     }
   }
 ];

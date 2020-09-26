@@ -48,6 +48,11 @@ a.navbar-item.is-active,
 .navbar-link.is-active {
   background-color: darken($white, 2.5);
 }
+// navbar brand left space override
+.navbar > .container .navbar-brand,
+.container > .navbar .navbar-brand {
+  margin-left: -0.75rem;
+}
 .x-footer {
   flex-shrink: 0;
 }
@@ -85,19 +90,13 @@ a.navbar-item.is-active,
   font-size: (14/16) * 1rem;
 }
 .signin {
-  // .content {
-  //   margin-top: -0.5rem;
-  //   margin-bottom: 1rem;
-  // }
   .box {
     padding-right: $golden * 1rem;
     padding-bottom: 2rem;
     padding-left: $golden * 1rem;
   }
   .column {
-    // @media screen and (min-width: 600px) {
     max-width: 26rem;
-    // }
   }
 }
 [v-cloak] {
