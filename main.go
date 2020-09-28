@@ -9,8 +9,10 @@ import (
 	"time"
 
 	"git.ryanburnette.com/ryanburnette/git-deploy/assets"
+
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
+	_ "github.com/joho/godotenv/autoload"
 )
 
 var (

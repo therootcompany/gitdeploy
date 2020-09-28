@@ -2,6 +2,10 @@
 ## explicit
 github.com/go-chi/chi
 github.com/go-chi/chi/middleware
+# github.com/joho/godotenv v1.3.0
+## explicit
+github.com/joho/godotenv
+github.com/joho/godotenv/autoload
 # github.com/shurcooL/httpfs v0.0.0-20190707220628-8d4bc4ba7749
 ## explicit
 github.com/shurcooL/httpfs/vfsutil

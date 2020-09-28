@@ -1,6 +1,8 @@
 *_vfsdata.go
 /gitdeploy
 /git-deploy
+*.env
+.env
 
 node_modules/
 dist/
