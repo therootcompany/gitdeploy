@@ -46,7 +46,22 @@ var runFlags *flag.FlagSet
 var runOpts runOptions
 var initFlags *flag.FlagSet
 
+var webhookProviders = make(map[string]func())
+var webhooks = make(map[string]func(chi.Router))
+var maxBodySize int64 = 1024 * 1024
+
+var hooks chan webhook
+
+type webhook struct {
+	rev    string
+	ref    string
+	branch string
+	repo   string
+	org    string
+}
+
 func init() {
+	hooks = make(chan webhook)
 	runOpts = runOptions{}
 	runFlags = flag.NewFlagSet("run", flag.ExitOnError)
 	runFlags.StringVar(&runOpts.listen, "listen", ":3000", "the address and port on which to listen")
@@ -84,6 +99,7 @@ func main() {
 		initFlags.Parse(args[2:])
 	case "run":
 		runFlags.Parse(args[2:])
+		registerWebhooks()
 		serve()
 	default:
 		usage()
@@ -103,6 +119,7 @@ func serve() {
 		r.Use(middleware.Compress(flate.DefaultCompression))
 	}
 	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
 	r.Use(middleware.Recoverer)
 
 	var staticHandler http.HandlerFunc
@@ -125,6 +142,8 @@ func serve() {
 		}
 	}
 
+	loadWebhooks(r)
+
 	r.Get("/*", staticHandler)
 
 	fmt.Println("Listening for http (with reasonable timeouts) on", runOpts.listen)
@@ -136,9 +155,36 @@ func serve() {
 		WriteTimeout:      20 * time.Second,
 		MaxHeaderBytes:    1024 * 1024, // 1MiB
 	}
+
+	go func() {
+		for {
+			hook := <-hooks
+			// TODO os.Exec
+			fmt.Println(hook.org)
+			fmt.Println(hook.repo)
+			fmt.Println(hook.branch)
+		}
+	}()
+
 	if err := srv.ListenAndServe(); nil != err {
 		fmt.Fprintf(os.Stderr, "%s", err)
 		os.Exit(1)
 		return
 	}
+}
+
+func registerWebhooks() {
+	for _, add := range webhookProviders {
+		add()
+	}
+}
+
+func loadWebhooks(r chi.Router) {
+	r.Route("/api/webhooks", func(r chi.Router) {
+		for provider, handler := range webhooks {
+			r.Route("/"+provider, func(r chi.Router) {
+				handler(r)
+			})
+		}
+	})
 }
