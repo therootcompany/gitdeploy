@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
 	"git.ryanburnette.com/ryanburnette/git-deploy/assets"
 	"github.com/go-chi/chi"
@@ -102,28 +103,38 @@ func serve() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
+	var staticHandler http.HandlerFunc
 	pub := http.FileServer(assets.Assets)
 
-	var dev http.Handler
-	var devFS http.FileSystem
 	if len(runOpts.static) > 0 {
-		devFS = http.Dir(runOpts.static)
-		dev = http.FileServer(devFS)
-		r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
+		// try the user-provided directory first, then fallback to the built-in
+		devFS := http.Dir(runOpts.static)
+		dev := http.FileServer(devFS)
+		staticHandler = func(w http.ResponseWriter, r *http.Request) {
 			if _, err := devFS.Open(r.URL.Path); nil != err {
 				pub.ServeHTTP(w, r)
 				return
 			}
 			dev.ServeHTTP(w, r)
-		})
+		}
 	} else {
-		r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
+		staticHandler = func(w http.ResponseWriter, r *http.Request) {
 			pub.ServeHTTP(w, r)
-		})
+		}
 	}
 
-	fmt.Println("Listening for http on", runOpts.listen)
-	if err := http.ListenAndServe(runOpts.listen, r); nil != err {
+	r.Get("/*", staticHandler)
+
+	fmt.Println("Listening for http (with reasonable timeouts) on", runOpts.listen)
+	srv := &http.Server{
+		Addr:              runOpts.listen,
+		Handler:           r,
+		ReadHeaderTimeout: 2 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      20 * time.Second,
+		MaxHeaderBytes:    1024 * 1024, // 1MiB
+	}
+	if err := srv.ListenAndServe(); nil != err {
 		fmt.Fprintf(os.Stderr, "%s", err)
 		os.Exit(1)
 		return
