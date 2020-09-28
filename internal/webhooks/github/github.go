@@ -1,6 +1,4 @@
-// // +build github
-
-package main
+package github
 
 import (
 	"fmt"
@@ -9,17 +7,23 @@ import (
 	"net/http"
 	"os"
 
+	"git.ryanburnette.com/ryanburnette/git-deploy/internal/options"
+	"git.ryanburnette.com/ryanburnette/git-deploy/internal/webhooks"
+
 	"github.com/go-chi/chi"
 	"github.com/google/go-github/v32/github"
 )
 
 func init() {
-	githubSecret := ""
-	runFlags.StringVar(&githubSecret, "github-secret", "", "secret for github webhooks (same as GITHUB_SECRET=)")
-	webhookProviders["github"] = registerGithubish("github", &githubSecret, "GITHUB_SECRET")
+	var githubSecret string
+	options.ServerFlags.StringVar(
+		&githubSecret, "github-secret", "",
+		"secret for github webhooks (same as GITHUB_SECRET=)",
+	)
+	webhooks.AddProvider("github", InitWebhook("github", &githubSecret, "GITHUB_SECRET"))
 }
 
-func registerGithubish(providername string, secret *string, envname string) func() {
+func InitWebhook(providername string, secret *string, envname string) func() {
 	return func() {
 		if "" == *secret {
 			*secret = os.Getenv(envname)
@@ -29,9 +33,9 @@ func registerGithubish(providername string, secret *string, envname string) func
 			return
 		}
 		githubSecretB := []byte(*secret)
-		webhooks[providername] = func(router chi.Router) {
+		webhooks.AddRouteHandler(providername, func(router chi.Router) {
 			router.Post("/", func(w http.ResponseWriter, r *http.Request) {
-				body := http.MaxBytesReader(w, r.Body, maxBodySize)
+				body := http.MaxBytesReader(w, r.Body, options.DefaultMaxBodySize)
 				defer func() {
 					_ = body.Close()
 				}()
@@ -63,13 +67,13 @@ func registerGithubish(providername string, secret *string, envname string) func
 
 					ref := e.GetRef() // *e.Ref
 					branch := ref[len("refs/heads/"):]
-					hooks <- webhook{
-						rev:    e.GetAfter(), // *e.After
-						ref:    ref,
-						branch: branch,
-						repo:   e.GetRepo().GetName(),         // *e.Repo.Name
-						org:    e.GetRepo().GetOrganization(), // *e.Repo.Organization
-					}
+					webhooks.Hook(webhooks.Ref{
+						Rev:    e.GetAfter(), // *e.After
+						Ref:    ref,
+						Branch: branch,
+						Repo:   e.GetRepo().GetName(),         // *e.Repo.Name
+						Org:    e.GetRepo().GetOrganization(), // *e.Repo.Organization
+					})
 				/*
 					case *github.PullRequestEvent:
 						// probably doesn't matter
@@ -84,6 +88,6 @@ func registerGithubish(providername string, secret *string, envname string) func
 				}
 
 			})
-		}
+		})
 	}
 }

@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"git.ryanburnette.com/ryanburnette/git-deploy/assets"
+	"git.ryanburnette.com/ryanburnette/git-deploy/internal/options"
+	"git.ryanburnette.com/ryanburnette/git-deploy/internal/webhooks"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -35,39 +37,18 @@ func ver() {
 	fmt.Printf("%s v%s %s (%s)\n", name, version, commit[:7], date)
 }
 
-type runOptions struct {
-	listen     string
-	trustProxy bool
-	compress   bool
-	static     string
-}
-
+var runOpts *options.ServerConfig
 var runFlags *flag.FlagSet
-var runOpts runOptions
 var initFlags *flag.FlagSet
 
-var webhookProviders = make(map[string]func())
-var webhooks = make(map[string]func(chi.Router))
-var maxBodySize int64 = 1024 * 1024
-
-var hooks chan webhook
-
-type webhook struct {
-	rev    string
-	ref    string
-	branch string
-	repo   string
-	org    string
-}
-
 func init() {
-	hooks = make(chan webhook)
-	runOpts = runOptions{}
-	runFlags = flag.NewFlagSet("run", flag.ExitOnError)
-	runFlags.StringVar(&runOpts.listen, "listen", ":3000", "the address and port on which to listen")
-	runFlags.BoolVar(&runOpts.trustProxy, "trust-proxy", false, "trust X-Forwarded-For header")
-	runFlags.BoolVar(&runOpts.compress, "compress", true, "enable compression for text,html,js,css,etc")
-	runFlags.StringVar(&runOpts.static, "serve-path", "", "path to serve, falls back to built-in web app")
+	runOpts = options.Server
+	runFlags = options.ServerFlags
+	initFlags = options.InitFlags
+	runFlags.StringVar(&runOpts.Addr, "listen", ":3000", "the address and port on which to listen")
+	runFlags.BoolVar(&runOpts.TrustProxy, "trust-proxy", false, "trust X-Forwarded-For header")
+	runFlags.BoolVar(&runOpts.Compress, "compress", true, "enable compression for text,html,js,css,etc")
+	runFlags.StringVar(&runOpts.ServePath, "serve-path", "", "path to serve, falls back to built-in web app")
 }
 
 func main() {
@@ -99,7 +80,7 @@ func main() {
 		initFlags.Parse(args[2:])
 	case "run":
 		runFlags.Parse(args[2:])
-		registerWebhooks()
+		webhooks.MustRegisterAll()
 		serve()
 	default:
 		usage()
@@ -112,10 +93,10 @@ func serve() {
 	r := chi.NewRouter()
 
 	// A good base middleware stack
-	if runOpts.trustProxy {
+	if runOpts.TrustProxy {
 		r.Use(middleware.RealIP)
 	}
-	if runOpts.compress {
+	if runOpts.Compress {
 		r.Use(middleware.Compress(flate.DefaultCompression))
 	}
 	r.Use(middleware.Logger)
@@ -125,9 +106,9 @@ func serve() {
 	var staticHandler http.HandlerFunc
 	pub := http.FileServer(assets.Assets)
 
-	if len(runOpts.static) > 0 {
+	if len(runOpts.ServePath) > 0 {
 		// try the user-provided directory first, then fallback to the built-in
-		devFS := http.Dir(runOpts.static)
+		devFS := http.Dir(runOpts.ServePath)
 		dev := http.FileServer(devFS)
 		staticHandler = func(w http.ResponseWriter, r *http.Request) {
 			if _, err := devFS.Open(r.URL.Path); nil != err {
@@ -142,13 +123,13 @@ func serve() {
 		}
 	}
 
-	loadWebhooks(r)
+	webhooks.RouteHandlers(r)
 
 	r.Get("/*", staticHandler)
 
-	fmt.Println("Listening for http (with reasonable timeouts) on", runOpts.listen)
+	fmt.Println("Listening for http (with reasonable timeouts) on", runOpts.Addr)
 	srv := &http.Server{
-		Addr:              runOpts.listen,
+		Addr:              runOpts.Addr,
 		Handler:           r,
 		ReadHeaderTimeout: 2 * time.Second,
 		ReadTimeout:       10 * time.Second,
@@ -158,11 +139,11 @@ func serve() {
 
 	go func() {
 		for {
-			hook := <-hooks
+			hook := webhooks.Accept()
 			// TODO os.Exec
-			fmt.Println(hook.org)
-			fmt.Println(hook.repo)
-			fmt.Println(hook.branch)
+			fmt.Println(hook.Org)
+			fmt.Println(hook.Repo)
+			fmt.Println(hook.Branch)
 		}
 	}()
 
@@ -171,20 +152,4 @@ func serve() {
 		os.Exit(1)
 		return
 	}
-}
-
-func registerWebhooks() {
-	for _, add := range webhookProviders {
-		add()
-	}
-}
-
-func loadWebhooks(r chi.Router) {
-	r.Route("/api/webhooks", func(r chi.Router) {
-		for provider, handler := range webhooks {
-			r.Route("/"+provider, func(r chi.Router) {
-				handler(r)
-			})
-		}
-	})
 }
