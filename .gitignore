@@ -1,2 +1,9 @@
+*_vfsdata.go
+/gitdeploy
+/git-deploy
+
 node_modules/
 dist/
+
+.DS_Store
+.*.sw*

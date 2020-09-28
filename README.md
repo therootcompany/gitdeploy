@@ -2,6 +2,28 @@
 
 **git-deploy** is an app for handling continuous deployment of static websites.
 
+## Build
+
+```bash
+pushd html/
+npm install
+./scripts/development
+popd
+```
+
+```bash
+go mod tidy
+go mod vendor
+go generate -mod=vendor ./...
+go build -mod=vendor .
+```
+
+```bash
+./git-deploy run --listen :3000 --serve-path ./overrides
+```
+
+## TODO
+
 **git-deploy** is intended for use with static websites that are generated after
 changes are pushed to a Git repository. This works with sites that are being
 edited in code and tracked in Git. Sites that have their content managed with a
