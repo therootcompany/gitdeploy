@@ -1,5 +1,4 @@
-// // +build github
-// TODO omit github unless specified by build tag
+// +build !nogithub
 
 package main
 

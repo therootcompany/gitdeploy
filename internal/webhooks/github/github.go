@@ -12,6 +12,8 @@ import (
 	"git.ryanburnette.com/ryanburnette/git-deploy/internal/webhooks"
 
 	"github.com/go-chi/chi"
+	// TODO nix this dependency in favor of a lightweight X-Hub-Signature
+	// and JSON-to-Go-struct approach
 	"github.com/google/go-github/v32/github"
 )
 

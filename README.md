@@ -69,6 +69,17 @@ Just the `push` event.
 Active: ✅
 ```
 
+### Bitbucket
+
+Sometimes Bitbucket does not give you the option to specify the (`X-Hub-Signature`) `secret`,
+so you'll have to append an `access_token` instead. Example:
+
+```txt
+Title: git-deploy
+URL: https://YOUR_DOMAIN/api/webhooks/bitbucket?access_token=YOUR_SECRET
+Triggers: Repository push
+```
+
 ## TODO
 
 **git-deploy** is intended for use with static websites that are generated after

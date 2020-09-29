@@ -93,9 +93,9 @@ func main() {
 		os.Exit(0)
 		return
 	case "init":
-		initFlags.Parse(args[2:])
+		_ = initFlags.Parse(args[2:])
 	case "run":
-		runFlags.Parse(args[2:])
+		_ = runFlags.Parse(args[2:])
 		if "" == runOpts.Exec {
 			fmt.Printf("--exec <path/to/script.sh> is a required flag")
 			os.Exit(1)
@@ -210,7 +210,7 @@ func serve() {
 
 			go func() {
 				log.Printf("git-deploy job for %s#%s started\n", hook.HTTPSURL, hook.RefName)
-				cmd.Wait()
+				_ = cmd.Wait()
 				delete(jobs, jobID)
 				log.Printf("git-deploy job for %s#%s finished\n", hook.HTTPSURL, hook.RefName)
 			}()
