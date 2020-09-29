@@ -13,29 +13,29 @@ import (
 //     Repo     ex: example
 //     Org      ex: example
 type Ref struct {
-	HTTPSURL string
-	SSHURL   string
-	Rev      string
-	Ref      string
-	RefType  string // tags, heads
-	RefName  string
-	Branch   string
-	Tag      string
-	Owner    string
-	Repo     string
+	HTTPSURL string `json:"clone_url"`
+	SSHURL   string `json:"-"`
+	Rev      string `json:"-"`
+	Ref      string `json:"-"`        // refs/tags/v0.0.1, refs/heads/master
+	RefType  string `json:"ref_type"` // tag, branch
+	RefName  string `json:"ref_name"`
+	Branch   string `json:"-"`
+	Tag      string `json:"-"`
+	Owner    string `json:"repo_owner"`
+	Repo     string `json:"repo_name"`
 }
 
 var Providers = make(map[string]func())
 var Webhooks = make(map[string]func(chi.Router))
 
-var hooks = make(chan Ref)
+var Hooks = make(chan Ref)
 
 func Hook(r Ref) {
-	hooks <- r
+	Hooks <- r
 }
 
 func Accept() Ref {
-	return <-hooks
+	return <-Hooks
 }
 
 func AddProvider(name string, initProvider func()) {
