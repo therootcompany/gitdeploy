@@ -44,6 +44,17 @@ go generate -mod=vendor ./...
 go build -mod=vendor .
 ```
 
+You can use build tags to remove providers from the build:
+
+```bash
+go build -mod=vendor -tags nobitbucket,nogithub .
+```
+
+Supported tags are:
+
+- nogithub
+- nobitbucket
+
 ## Add Webhooks
 
 To add a webhook you'll first need a secret
