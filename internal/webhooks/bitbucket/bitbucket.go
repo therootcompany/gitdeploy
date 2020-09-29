@@ -43,10 +43,7 @@ func InitWebhook(providername string, secret *string, envname string) func() {
 		secretB := []byte(*secret)
 		webhooks.AddRouteHandler(providername, func(router chi.Router) {
 			router.Post("/", func(w http.ResponseWriter, r *http.Request) {
-				body := http.MaxBytesReader(w, r.Body, options.DefaultMaxBodySize)
-				defer func() {
-					_ = body.Close()
-				}()
+				r.Body = http.MaxBytesReader(w, r.Body, options.DefaultMaxBodySize)
 
 				accessToken := r.URL.Query().Get("access_token")
 				if "" != accessToken {
