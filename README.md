@@ -43,3 +43,7 @@ don't want to use it.
 [Pocket ID](https://pocketid.app). Authentication can also be disabled if you
 don't want to use it. The built-in interface requires the built-in
 authentication.
+
+## License
+
+Copyright 2020. All rights reserved.
