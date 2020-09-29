@@ -17,9 +17,12 @@ type Ref struct {
 	SSHURL   string
 	Rev      string
 	Ref      string
+	RefType  string // tags, heads
+	RefName  string
 	Branch   string
+	Tag      string
+	Owner    string
 	Repo     string
-	Org      string
 }
 
 var Providers = make(map[string]func())

@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"git.ryanburnette.com/ryanburnette/git-deploy/internal/options"
 	"git.ryanburnette.com/ryanburnette/git-deploy/internal/webhooks"
@@ -63,16 +64,33 @@ func InitWebhook(providername string, secret *string, envname string) func() {
 
 				switch e := event.(type) {
 				case *github.PushEvent:
-					// this is a commit push, do something with it
+					var branch string
+					var tag string
 
 					ref := e.GetRef() // *e.Ref
-					branch := ref[len("refs/heads/"):]
+					parts := strings.Split(ref, "/")
+					refType := parts[1]
+					prefixLen := len("refs/") + len(refType) + len("/")
+					refName := ref[prefixLen:]
+					switch refType {
+					case "tags":
+						refType = "tag"
+						tag = refName
+					case "heads":
+						refType = "branch"
+						branch = refName
+					}
 					webhooks.Hook(webhooks.Ref{
-						Rev:    e.GetAfter(), // *e.After
-						Ref:    ref,
-						Branch: branch,
-						Repo:   e.GetRepo().GetName(),         // *e.Repo.Name
-						Org:    e.GetRepo().GetOrganization(), // *e.Repo.Organization
+						HTTPSURL: e.GetRepo().GetCloneURL(),
+						SSHURL:   e.GetRepo().GetSSHURL(),
+						Rev:      e.GetAfter(), // *e.After
+						Ref:      ref,
+						RefType:  refType,
+						RefName:  refName,
+						Branch:   branch,
+						Tag:      tag,
+						Repo:     e.GetRepo().GetName(), // *e.Repo.Name
+						Owner:    e.GetRepo().GetOwner().GetLogin(),
 					})
 				/*
 					case *github.PullRequestEvent:

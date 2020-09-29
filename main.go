@@ -2,10 +2,13 @@ package main
 
 import (
 	"compress/flate"
+	"encoding/base64"
 	"flag"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"time"
 
 	"git.ryanburnette.com/ryanburnette/git-deploy/assets"
@@ -37,6 +40,14 @@ func ver() {
 	fmt.Printf("%s v%s %s (%s)\n", name, version, commit[:7], date)
 }
 
+type job struct {
+	ID  string // {HTTPSURL}#{BRANCH}
+	Cmd *exec.Cmd
+	Ref webhooks.Ref
+}
+
+var jobs = make(map[string]*job)
+
 var runOpts *options.ServerConfig
 var runFlags *flag.FlagSet
 var initFlags *flag.FlagSet
@@ -48,7 +59,12 @@ func init() {
 	runFlags.StringVar(&runOpts.Addr, "listen", ":3000", "the address and port on which to listen")
 	runFlags.BoolVar(&runOpts.TrustProxy, "trust-proxy", false, "trust X-Forwarded-For header")
 	runFlags.BoolVar(&runOpts.Compress, "compress", true, "enable compression for text,html,js,css,etc")
-	runFlags.StringVar(&runOpts.ServePath, "serve-path", "", "path to serve, falls back to built-in web app")
+	runFlags.StringVar(
+		&runOpts.ServePath, "serve-path", "",
+		"path to serve, falls back to built-in web app")
+	runFlags.StringVar(
+		&runOpts.Exec, "exec", "",
+		"path to bash script to run with git info as arguments")
 }
 
 func main() {
@@ -80,6 +96,11 @@ func main() {
 		initFlags.Parse(args[2:])
 	case "run":
 		runFlags.Parse(args[2:])
+		if "" == runOpts.Exec {
+			fmt.Printf("--exec <path/to/script.sh> is a required flag")
+			os.Exit(1)
+			return
+		}
 		webhooks.MustRegisterAll()
 		serve()
 	default:
@@ -141,9 +162,58 @@ func serve() {
 		for {
 			hook := webhooks.Accept()
 			// TODO os.Exec
-			fmt.Println(hook.Org)
-			fmt.Println(hook.Repo)
-			fmt.Println(hook.Branch)
+			fmt.Printf("%#v\n", hook)
+			jobID := base64.URLEncoding.EncodeToString([]byte(
+				fmt.Sprintf("%s#%s", hook.HTTPSURL, hook.RefName),
+			))
+
+			args := []string{
+				runOpts.Exec,
+				jobID,
+				hook.RefName,
+				hook.RefType,
+				hook.Owner,
+				hook.Repo,
+				hook.HTTPSURL,
+			}
+			cmd := exec.Command("bash", args...)
+
+			env := os.Environ()
+			envs := []string{
+				"GIT_DEPLOY_JOB_ID=" + jobID,
+				"GIT_REF_NAME=" + hook.RefName,
+				"GIT_REF_TYPE=" + hook.RefType,
+				"GIT_REPO_OWNER=" + hook.Owner,
+				"GIT_REPO_NAME=" + hook.Repo,
+				"GIT_CLONE_URL=" + hook.HTTPSURL,
+			}
+			cmd.Env = append(env, envs...)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+
+			if _, exists := jobs[jobID]; exists {
+				// TODO put job in backlog
+				log.Printf("git-deploy job already started for %s#%s\n", hook.HTTPSURL, hook.RefName)
+				return
+			}
+
+			if err := cmd.Start(); nil != err {
+				log.Printf("git-deploy exec error: %s\n", err)
+				return
+			}
+
+			jobs[jobID] = &job{
+				ID:  jobID,
+				Cmd: cmd,
+				Ref: hook,
+			}
+
+			go func() {
+				log.Printf("git-deploy job for %s#%s started\n", hook.HTTPSURL, hook.RefName)
+				cmd.Wait()
+				delete(jobs, jobID)
+				log.Printf("git-deploy job for %s#%s finished\n", hook.HTTPSURL, hook.RefName)
+			}()
 		}
 	}()
 

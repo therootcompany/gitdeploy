@@ -11,6 +11,7 @@ type ServerConfig struct {
 	TrustProxy bool
 	Compress   bool
 	ServePath  string
+	Exec       string
 }
 
 var ServerFlags *flag.FlagSet

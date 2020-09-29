@@ -2,6 +2,32 @@
 
 **git-deploy** is an app for handling continuous deployment of static websites.
 
+## Usage
+
+```bash
+echo 'GITHUB_SECRET=xxxxxxx' >> .env
+./git-deploy init
+./git-deploy run --listen :3000 --serve-path ./overrides --exec ./path/to/script.sh
+```
+
+To manage `git credentials`
+see [The Vanilla DevOps Git Credentials Cheatsheet][1]
+
+[1]: https://coolaj86.com/articles/vanilla-devops-git-credentials-cheatsheet/
+
+## Git Info
+
+The exec script will receive the parent environment as well as
+
+```bash
+GIT_DEPLOY_JOB_ID=xxxxxx
+GIT_REF_NAME=master
+GIT_REF_TYPE=branch
+GIT_REPO_OWNER=example
+GIT_REPO_NAME=example
+GIT_CLONE_URL=https://github.com/example/example
+```
+
 ## Build
 
 ```bash
@@ -16,10 +42,6 @@ go mod tidy
 go mod vendor
 go generate -mod=vendor ./...
 go build -mod=vendor .
-```
-
-```bash
-./git-deploy run --listen :3000 --serve-path ./overrides
 ```
 
 ## Add Webhooks
@@ -104,4 +126,8 @@ crypto
 
 ## License
 
-Copyright 2020. All rights reserved.
+Copyright 2020 The git-deploy Authors
+
+This Source Code Form is subject to the terms of the Mozilla Public \
+License, v. 2.0. If a copy of the MPL was not distributed with this \
+file, You can obtain one at https://mozilla.org/MPL/2.0/.
