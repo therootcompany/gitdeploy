@@ -1,33 +1,35 @@
 #!/usr/bin/env node
-'use strict';
+"use strict";
 
-var fs = require('fs');
-var { exec } = require('child_process');
+var fs = require("fs");
+var { exec } = require("child_process");
 
-var cmd = `rsync -av --exclude="**.js" --exclude="css/" --exclude="js/" src/ dist/`;
 fs.watch(
-  'src',
+  "src",
   {
-    recursive: true
+    recursive: true,
   },
   function (eventType, filename) {
-    //console.log(eventType, filename);
-    if (filename.includes('.html')) {
-      rsync();
+    if (filename.includes(".html")) {
+      copy().then(function () {
+        console.log("copied html");
+      });
     }
   }
 );
 
-function rsync() {
-  exec(
-    cmd,
-    {
-      path: process.env.PATH,
-      cwd: process.cwd()
-    },
-    function (err, stdout, stderr) {
-      console.log(stdout);
-    }
-  );
+async function copy() {
+  return new Promise(function (resolve) {
+    exec(
+      "scripts/copy",
+      {
+        path: process.env.PATH,
+        cwd: process.cwd(),
+      },
+      function (err, stdout, stderr) {
+        resolve();
+      }
+    );
+  });
 }
-rsync();
+copy();

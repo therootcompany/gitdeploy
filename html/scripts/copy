@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+mkdir -p dist/templates
+cp src/*.html dist/
+cp src/templates/*.html dist/templates/

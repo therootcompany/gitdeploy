@@ -32,8 +32,8 @@ GIT_CLONE_URL=https://github.com/example/example
 
 ```bash
 pushd html/
-npm install
-./scripts/development
+npm ci
+scripts/build
 popd
 ```
 
