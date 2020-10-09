@@ -55,6 +55,15 @@ Supported tags are:
 - nogithub
 - nobitbucket
 
+## Run as a System Service
+
+```bash
+sudo env PATH="$PATH" \
+  serviceman add --name gitdeploy --system \
+    --username app -path "$PATH" -- \
+    gitdeploy run --exec ./scripts/
+```
+
 ## Add Webhooks
 
 To add a webhook you'll first need a secret
