@@ -3,5 +3,5 @@
 package main
 
 import (
-	_ "git.ryanburnette.com/ryanburnette/git-deploy/internal/webhooks/gitea"
+	_ "git.rootprojects.org/root/gitdeploy/internal/webhooks/gitea"
 )

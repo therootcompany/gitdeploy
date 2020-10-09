@@ -1,4 +1,4 @@
-module git.ryanburnette.com/ryanburnette/git-deploy
+module git.rootprojects.org/root/gitdeploy
 
 go 1.15
 

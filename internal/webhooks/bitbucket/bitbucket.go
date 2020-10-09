@@ -10,8 +10,8 @@ import (
 	"os"
 	"strings"
 
-	"git.ryanburnette.com/ryanburnette/git-deploy/internal/options"
-	"git.ryanburnette.com/ryanburnette/git-deploy/internal/webhooks"
+	"git.rootprojects.org/root/gitdeploy/internal/options"
+	"git.rootprojects.org/root/gitdeploy/internal/webhooks"
 
 	"github.com/go-chi/chi"
 	"github.com/google/go-github/v32/github"

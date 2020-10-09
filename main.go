@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"git.ryanburnette.com/ryanburnette/git-deploy/assets"
-	"git.ryanburnette.com/ryanburnette/git-deploy/internal/options"
-	"git.ryanburnette.com/ryanburnette/git-deploy/internal/webhooks"
+	"git.rootprojects.org/root/gitdeploy/assets"
+	"git.rootprojects.org/root/gitdeploy/internal/options"
+	"git.rootprojects.org/root/gitdeploy/internal/webhooks"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -339,12 +339,12 @@ func runHook(hook webhooks.Ref) {
 
 	if _, exists := jobs[jobID]; exists {
 		// TODO put job in backlog
-		log.Printf("git-deploy job already started for %s#%s\n", hook.HTTPSURL, hook.RefName)
+		log.Printf("gitdeploy job already started for %s#%s\n", hook.HTTPSURL, hook.RefName)
 		return
 	}
 
 	if err := cmd.Start(); nil != err {
-		log.Printf("git-deploy exec error: %s\n", err)
+		log.Printf("gitdeploy exec error: %s\n", err)
 		return
 	}
 
@@ -356,12 +356,12 @@ func runHook(hook webhooks.Ref) {
 	}
 
 	go func() {
-		log.Printf("git-deploy job for %s#%s started\n", hook.HTTPSURL, hook.RefName)
+		log.Printf("gitdeploy job for %s#%s started\n", hook.HTTPSURL, hook.RefName)
 		if err := cmd.Wait(); nil != err {
-			log.Printf("git-deploy job for %s#%s exited with error: %v", hook.HTTPSURL, hook.RefName, err)
+			log.Printf("gitdeploy job for %s#%s exited with error: %v", hook.HTTPSURL, hook.RefName, err)
 			return
 		}
-		log.Printf("git-deploy job for %s#%s finished\n", hook.HTTPSURL, hook.RefName)
+		log.Printf("gitdeploy job for %s#%s finished\n", hook.HTTPSURL, hook.RefName)
 		// TODO check for backlog
 	}()
 }
@@ -420,17 +420,17 @@ func runPromote(hook webhooks.Ref, promoteTo string) {
 
 	if _, exists := jobs[jobID1]; exists {
 		// TODO put promote in backlog
-		log.Printf("git-deploy job already started for %s#%s\n", hook.HTTPSURL, hook.RefName)
+		log.Printf("gitdeploy job already started for %s#%s\n", hook.HTTPSURL, hook.RefName)
 		return
 	}
 	if _, exists := jobs[jobID2]; exists {
 		// TODO put promote in backlog
-		log.Printf("git-deploy job already started for %s#%s\n", hook.HTTPSURL, promoteTo)
+		log.Printf("gitdeploy job already started for %s#%s\n", hook.HTTPSURL, promoteTo)
 		return
 	}
 
 	if err := cmd.Start(); nil != err {
-		log.Printf("git-deploy exec error: %s\n", err)
+		log.Printf("gitdeploy exec error: %s\n", err)
 		return
 	}
 
@@ -448,11 +448,11 @@ func runPromote(hook webhooks.Ref, promoteTo string) {
 	}
 
 	go func() {
-		log.Printf("git-deploy promote for %s#%s started\n", hook.HTTPSURL, hook.RefName)
+		log.Printf("gitdeploy promote for %s#%s started\n", hook.HTTPSURL, hook.RefName)
 		_ = cmd.Wait()
 		killers <- jobID1
 		killers <- jobID2
-		log.Printf("git-deploy promote for %s#%s finished\n", hook.HTTPSURL, hook.RefName)
+		log.Printf("gitdeploy promote for %s#%s finished\n", hook.HTTPSURL, hook.RefName)
 		// TODO check for backlog
 	}()
 }

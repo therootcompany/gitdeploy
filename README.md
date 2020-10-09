@@ -1,13 +1,13 @@
-# [git-deploy](https://git.ryanburnette.com/ryanburnette/git-deploy)
+# [gitdeploy](https://git.rootprojects.org/root/gitdeploy)
 
-**git-deploy** is an app for handling continuous deployment of static websites.
+**gitdeploy** is an app for handling continuous deployment of static websites.
 
 ## Usage
 
 ```bash
 echo 'GITHUB_SECRET=xxxxxxx' >> .env
-./git-deploy init
-./git-deploy run --listen :3000 --serve-path ./overrides --exec ./path/to/script.sh
+./gitdeploy init
+./gitdeploy run --listen :3000 --serve-path ./overrides --exec ./path/to/script.sh
 ```
 
 To manage `git credentials`
@@ -86,29 +86,29 @@ Sometimes Bitbucket does not give you the option to specify the (`X-Hub-Signatur
 so you'll have to append an `access_token` instead. Example:
 
 ```txt
-Title: git-deploy
+Title: gitdeploy
 URL: https://YOUR_DOMAIN/api/webhooks/bitbucket?access_token=YOUR_SECRET
 Triggers: Repository push
 ```
 
 ## TODO
 
-**git-deploy** is intended for use with static websites that are generated after
+**gitdeploy** is intended for use with static websites that are generated after
 changes are pushed to a Git repository. This works with sites that are being
 edited in code and tracked in Git. Sites that have their content managed with a
 headless CMS that pushes to Git are also very well-suited.
 
-**git-deploy** supports verified webhooks from Github, Bitbucket, and Gitea.
+**gitdeploy** supports verified webhooks from Github, Bitbucket, and Gitea.
 
-**git-deploy** is written in Go. This means that it's a standalone binary
+**gitdeploy** is written in Go. This means that it's a standalone binary
 available on all major operating systems and architectures. It provides an API
 with endpoints that handle webhooks, allow for initiation of builds, and getting
 the status of builds and build jobs.
 
-**git-deploy** comes with a simple interface. The interface be disabled if you
+**gitdeploy** comes with a simple interface. The interface be disabled if you
 don't want to use it.
 
-**git-deploy** also comes with basic authentication via integration with
+**gitdeploy** also comes with basic authentication via integration with
 [Pocket ID](https://pocketid.app). Authentication can also be disabled if you
 don't want to use it. The built-in interface requires the built-in
 authentication.
@@ -148,7 +148,7 @@ crypto
 
 ## License
 
-Copyright 2020 The git-deploy Authors
+Copyright 2020 The gitdeploy Authors
 
 This Source Code Form is subject to the terms of the Mozilla Public \
 License, v. 2.0. If a copy of the MPL was not distributed with this \
