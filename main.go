@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"git.ryanburnette.com/ryanburnette/git-deploy/assets"
@@ -316,11 +317,18 @@ func runHook(hook webhooks.Ref) {
 	}
 	cmd := exec.Command("bash", args...)
 
+	// https://git.example.com/example/project.git
+	//      => git.example.com/example/project
+	repoID := strings.TrimPrefix(hook.HTTPSURL, "https://")
+	repoID = strings.TrimPrefix(repoID, "https://")
+	repoID = strings.TrimSuffix(repoID, ".git")
+
 	env := os.Environ()
 	envs := []string{
 		"GIT_DEPLOY_JOB_ID=" + jobID,
 		"GIT_REF_NAME=" + hook.RefName,
 		"GIT_REF_TYPE=" + hook.RefType,
+		"GIT_REPO_ID=" + repoID,
 		"GIT_REPO_OWNER=" + hook.Owner,
 		"GIT_REPO_NAME=" + hook.Repo,
 		"GIT_CLONE_URL=" + hook.HTTPSURL,
@@ -349,8 +357,10 @@ func runHook(hook webhooks.Ref) {
 
 	go func() {
 		log.Printf("git-deploy job for %s#%s started\n", hook.HTTPSURL, hook.RefName)
-		_ = cmd.Wait()
-		killers <- jobID
+		if err := cmd.Wait(); nil != err {
+			log.Printf("git-deploy job for %s#%s exited with error: %v", hook.HTTPSURL, hook.RefName, err)
+			return
+		}
 		log.Printf("git-deploy job for %s#%s finished\n", hook.HTTPSURL, hook.RefName)
 		// TODO check for backlog
 	}()
