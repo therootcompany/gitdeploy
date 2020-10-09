@@ -61,7 +61,7 @@ func init() {
 	runOpts = options.Server
 	runFlags = options.ServerFlags
 	initFlags = options.InitFlags
-	runFlags.StringVar(&runOpts.Addr, "listen", ":3000", "the address and port on which to listen")
+	runFlags.StringVar(&runOpts.Addr, "listen", "", "the address and port on which to listen (default :4483)")
 	runFlags.BoolVar(&runOpts.TrustProxy, "trust-proxy", false, "trust X-Forwarded-For header")
 	runFlags.BoolVar(&runOpts.Compress, "compress", true, "enable compression for text,html,js,css,etc")
 	runFlags.StringVar(
@@ -104,6 +104,17 @@ func main() {
 		_ = runFlags.Parse(args[2:])
 		if "" == runOpts.Exec {
 			fmt.Printf("--exec <path/to/scripts/> is a required flag")
+			os.Exit(1)
+			return
+		}
+		if 0 == len(runOpts.Addr) {
+			runOpts.Addr = os.Getenv("LISTEN")
+		}
+		if 0 == len(runOpts.Addr) {
+			runOpts.Addr = "localhost:" + os.Getenv("PORT")
+		}
+		if 0 == len(runOpts.Addr) {
+			fmt.Printf("--listen <[addr]:port> is a required flag")
 			os.Exit(1)
 			return
 		}

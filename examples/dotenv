@@ -1,2 +1,4 @@
+PORT=4483
 GITHUB_SECRET=xxxxxxxxxxxxxxxxxxxxxx
+GITEA_SECRET=xxxxxxxxxxxxxxxxxxxxxx
 BITBUCKET_SECRET=xxxxxxxxxxxxxxxxxxxxxx
