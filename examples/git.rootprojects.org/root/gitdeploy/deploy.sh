@@ -9,6 +9,8 @@ fi
 
 echo "Deploying ${GIT_REPO_ID}#${GIT_REF_NAME} ..."
 
+# See the Git Credentials Cheat Sheet
+# https://coolaj86.com/articles/vanilla-devops-git-credentials-cheatsheet/
 my_tmp="$(mktemp -d -t "tmp.XXXXXXXXXX")"
 git clone --depth=1 "${GIT_CLONE_URL}" "${my_tmp}/${GIT_REPO_NAME}"
 pushd "${my_tmp}/${GIT_REPO_NAME}/"
