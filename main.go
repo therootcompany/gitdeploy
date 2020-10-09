@@ -288,7 +288,7 @@ func serve() {
 			case hook := <-webhooks.Hooks:
 				runHook(hook)
 			case jobID := <-killers:
-				kill(jobID)
+				remove(jobID, false)
 			}
 		}
 	}()
@@ -359,14 +359,15 @@ func runHook(hook webhooks.Ref) {
 		log.Printf("gitdeploy job for %s#%s started\n", hook.HTTPSURL, hook.RefName)
 		if err := cmd.Wait(); nil != err {
 			log.Printf("gitdeploy job for %s#%s exited with error: %v", hook.HTTPSURL, hook.RefName, err)
-			return
+		} else {
+			log.Printf("gitdeploy job for %s#%s finished\n", hook.HTTPSURL, hook.RefName)
 		}
-		log.Printf("gitdeploy job for %s#%s finished\n", hook.HTTPSURL, hook.RefName)
+		remove(jobID, true)
 		// TODO check for backlog
 	}()
 }
 
-func kill(jobID string) {
+func remove(jobID string, nokill bool) {
 	job, exists := jobs[jobID]
 	if !exists {
 		return
