@@ -1,6 +1,9 @@
 package gitea
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -13,7 +16,6 @@ import (
 	"git.ryanburnette.com/ryanburnette/git-deploy/internal/webhooks"
 
 	"github.com/go-chi/chi"
-	"github.com/google/go-github/v32/github"
 )
 
 func init() {
@@ -50,9 +52,10 @@ func InitWebhook(providername string, secret *string, envname string) func() {
 					return
 				}
 
-				sig := "sha256=" + r.Header.Get("X_GITEA_SIGNATURE")
-				if err := github.ValidateSignature(sig, payload, secretB); nil != err {
-					log.Printf("invalid gitea signature: error: %s\n", err)
+				sig := r.Header.Get("X-Gitea-Signature")
+				sigB, err := hex.DecodeString(sig)
+				if !ValidMAC(payload, sigB, secretB) {
+					log.Printf("invalid gitea signature: %q\n", sig)
 					http.Error(w, "invalid gitea signature", http.StatusBadRequest)
 					return
 				}
@@ -97,4 +100,12 @@ func InitWebhook(providername string, secret *string, envname string) func() {
 			})
 		})
 	}
+}
+
+// ValidMAC reports whether messageMAC is a valid HMAC tag for message.
+func ValidMAC(message, messageMAC, key []byte) bool {
+	mac := hmac.New(sha256.New, key)
+	mac.Write(message)
+	expectedMAC := mac.Sum(nil)
+	return hmac.Equal(messageMAC, expectedMAC)
 }
