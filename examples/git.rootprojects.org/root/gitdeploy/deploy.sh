@@ -10,7 +10,7 @@ fi
 echo "Deploying ${GIT_REPO_ID}#${GIT_REF_NAME} ..."
 
 my_tmp="$(mktemp -d -t "tmp.XXXXXXXXXX")"
-git clone "${GIT_CLONE_URL}" "${my_tmp}/${GIT_REPO_NAME}"
+git clone --depth=1 "${GIT_CLONE_URL}" "${my_tmp}/${GIT_REPO_NAME}"
 pushd "${my_tmp}/${GIT_REPO_NAME}/"
   go generate -mod=vendor ./...
   go build -mod=vendor .
@@ -19,3 +19,5 @@ pushd "${my_tmp}/${GIT_REPO_NAME}/"
 
   sudo systemctl restart gitdeploy
 popd
+
+rm -rf "${my_tmp}/${GIT_REPO_NAME}/"
