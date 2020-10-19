@@ -7,7 +7,7 @@
 ```bash
 echo 'GITHUB_SECRET=xxxxxxx' >> .env
 ./gitdeploy init
-./gitdeploy run --listen :3000 --serve-path ./overrides --exec ./path/to/script.sh
+./gitdeploy run --listen :3000 --serve-path ./public_overrides --exec ./path/to/scripts/dir/
 ```
 
 To manage `git credentials`
@@ -28,12 +28,45 @@ GIT_REPO_NAME=example
 GIT_CLONE_URL=https://github.com/example/example
 ```
 
+You can see examples in `examples/git.example.com/org`
+
+## API
+
+```txt
+GET  /api/admin/jobs
+
+    {
+      "success": true,
+      "jobs": [
+        {
+          "job_id":     "xxxx",
+          "created_at": "2020-01-01T00:00:00Z",
+          "ref":        "0000000",
+        }
+      ]
+    }
+
+POST /api/admin/jobs
+  { "job_id": "xxxx", "kill": true }
+
+  { "success": true }
+
+# note: see --help for how to use --promotions
+POST /api/admin/promote
+  { "clone_url": "https://...", "ref_name": "development" }
+
+  { "success": true, "promote_to": "staging" }
+
+# note: each webhook is different, but the result is to run a deploy.sh
+POST /api/admin/webhooks/{github,gitea,bitbucket}
+```
+
 ## Build
 
 ```bash
 pushd html/
-npm ci
-scripts/build
+  npm ci
+  scripts/build
 popd
 ```
 

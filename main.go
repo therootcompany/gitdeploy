@@ -55,8 +55,9 @@ var killers = make(chan string)
 var runOpts *options.ServerConfig
 var runFlags *flag.FlagSet
 var initFlags *flag.FlagSet
-var promotions = []string{"production", "staging", "master"}
-var names = map[string]string{"master": "Development", "production": "Production", "staging": "Staging"}
+var promotions []string
+var promotionList string
+var defaultPromotionList = "production,staging,master"
 
 func init() {
 	runOpts = options.Server
@@ -72,6 +73,8 @@ func init() {
 		&runOpts.Exec, "exec", "",
 		"path to ./scripts/{deploy.sh,promote.sh,etc}")
 	//"path to bash script to run with git info as arguments")
+	runFlags.StringVar(&promotionList, "promotions", "",
+		"a list of promotable branches in descending order (default '"+defaultPromotionList+"')")
 }
 
 func main() {
@@ -119,6 +122,16 @@ func main() {
 			os.Exit(1)
 			return
 		}
+		if 0 == len(promotionList) {
+			promotionList = os.Getenv("PROMOTIONS")
+		}
+		if 0 == len(promotionList) {
+			promotionList = defaultPromotionList
+		}
+		promotions = strings.Fields(
+			strings.ReplaceAll(promotionList, ",", " "),
+		)
+
 		webhooks.MustRegisterAll()
 		serve()
 	default:
@@ -266,6 +279,15 @@ func serve() {
 
 			promoteTo := promotions[n]
 			runPromote(*msg, promoteTo)
+
+			b, _ := json.Marshal(struct {
+				Success   bool   `json:"success"`
+				PromoteTo string `json:"promote_to"`
+			}{
+				Success:   true,
+				PromoteTo: promoteTo,
+			})
+			w.Write(append(b, '\n'))
 		})
 	})
 	r.Get("/*", staticHandler)
