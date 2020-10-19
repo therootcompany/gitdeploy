@@ -1,6 +1,9 @@
 package webhooks
 
 import (
+	"os"
+	"strings"
+
 	"github.com/go-chi/chi"
 )
 
@@ -60,4 +63,22 @@ func RouteHandlers(r chi.Router) {
 			})
 		}
 	})
+}
+
+func ParseSecrets(providername, secretList, envname string) [][]byte {
+	if 0 == len(secretList) {
+		secretList = os.Getenv(envname)
+	}
+	if 0 == len(secretList) {
+		return nil
+	}
+
+	var secrets [][]byte
+	for _, secret := range strings.Fields(strings.ReplaceAll(secretList, ",", " ")) {
+		if len(secret) > 0 {
+			secrets = append(secrets, []byte(secret))
+		}
+	}
+
+	return secrets
 }

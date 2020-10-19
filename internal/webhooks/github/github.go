@@ -18,24 +18,22 @@ import (
 )
 
 func init() {
-	var githubSecret string
+	var githubSecrets string
 	options.ServerFlags.StringVar(
-		&githubSecret, "github-secret", "",
+		&githubSecrets, "github-secret", "",
 		"secret for github webhooks (same as GITHUB_SECRET=)",
 	)
-	webhooks.AddProvider("github", InitWebhook("github", &githubSecret, "GITHUB_SECRET"))
+	webhooks.AddProvider("github", InitWebhook("github", &githubSecrets, "GITHUB_SECRET"))
 }
 
-func InitWebhook(providername string, secret *string, envname string) func() {
+func InitWebhook(providername string, secretList *string, envname string) func() {
 	return func() {
-		if "" == *secret {
-			*secret = os.Getenv(envname)
-		}
-		if "" == *secret {
-			fmt.Fprintf(os.Stderr, "skipped route for missing %s\n", envname)
+		secrets := webhooks.ParseSecrets(providername, *secretList, envname)
+		if 0 == len(secrets) {
+			fmt.Fprintf(os.Stderr, "skipped route for missing %q\n", envname)
 			return
 		}
-		githubSecretB := []byte(*secret)
+
 		webhooks.AddRouteHandler(providername, func(router chi.Router) {
 			router.Post("/", func(w http.ResponseWriter, r *http.Request) {
 				r.Body = http.MaxBytesReader(w, r.Body, options.DefaultMaxBodySize)
@@ -47,9 +45,16 @@ func InitWebhook(providername string, secret *string, envname string) func() {
 				}
 
 				sig := r.Header.Get("X-Hub-Signature")
-				if err := github.ValidateSignature(sig, payload, githubSecretB); nil != err {
-					log.Printf("invalid github signature: error: %s\n", err)
-					http.Error(w, "invalid github signature", http.StatusBadRequest)
+				for _, secret := range secrets {
+					if err = github.ValidateSignature(sig, payload, secret); nil != err {
+						continue
+					}
+					// err = nil
+					break
+				}
+				if nil != err {
+					log.Printf("invalid %q signature: error: %s\n", providername, err)
+					http.Error(w, fmt.Sprintf("invalid %q signature", providername), http.StatusBadRequest)
 					return
 				}
 

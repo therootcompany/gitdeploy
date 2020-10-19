@@ -32,16 +32,14 @@ func init() {
 
 // InitWebhook prepares the webhook router.
 // It should be called after arguments are parsed and ENVs are set.InitWebhook
-func InitWebhook(providername string, secret *string, envname string) func() {
+func InitWebhook(providername string, secretList *string, envname string) func() {
 	return func() {
-		if "" == *secret {
-			*secret = os.Getenv(envname)
-		}
-		if "" == *secret {
-			fmt.Fprintf(os.Stderr, "skipped route for missing %s\n", envname)
+		secrets := webhooks.ParseSecrets(providername, *secretList, envname)
+		if 0 == len(secrets) {
+			fmt.Fprintf(os.Stderr, "skipped route for missing %q\n", envname)
 			return
 		}
-		secretB := []byte(*secret)
+
 		webhooks.AddRouteHandler(providername, func(router chi.Router) {
 			router.Post("/", func(w http.ResponseWriter, r *http.Request) {
 				r.Body = http.MaxBytesReader(w, r.Body, options.DefaultMaxBodySize)
@@ -52,11 +50,18 @@ func InitWebhook(providername string, secret *string, envname string) func() {
 					return
 				}
 
+				var valid bool
 				sig := r.Header.Get("X-Gitea-Signature")
 				sigB, err := hex.DecodeString(sig)
-				if !ValidMAC(payload, sigB, secretB) {
-					log.Printf("invalid gitea signature: %q\n", sig)
-					http.Error(w, "invalid gitea signature", http.StatusBadRequest)
+				for _, secret := range secrets {
+					if ValidMAC(payload, sigB, secret) {
+						valid = true
+						break
+					}
+				}
+				if !valid {
+					log.Printf("invalid %q signature: %q\n", providername, sig)
+					http.Error(w, fmt.Sprintf("invalid %q signature", providername), http.StatusBadRequest)
 					return
 				}
 

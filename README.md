@@ -10,8 +10,10 @@ echo 'GITHUB_SECRET=xxxxxxx' >> .env
 ./gitdeploy run --listen :3000 --serve-path ./public_overrides --exec ./path/to/scripts/dir/
 ```
 
-To manage `git credentials`
-see [The Vanilla DevOps Git Credentials Cheatsheet][1]
+Note: If you have mulitple webhook secrets - such as different repos with the same provider -
+you should put them in a comma-separated list, such as `GITHUB_SECRET=xxxxxxx,yyyyyyy`.
+
+To manage `git credentials` see [The Vanilla DevOps Git Credentials Cheatsheet][1]
 
 [1]: https://coolaj86.com/articles/vanilla-devops-git-credentials-cheatsheet/
 

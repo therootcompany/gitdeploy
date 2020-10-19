@@ -31,28 +31,31 @@ func init() {
 
 // InitWebhook prepares the webhook router.
 // It should be called after arguments are parsed and ENVs are set.InitWebhook
-func InitWebhook(providername string, secret *string, envname string) func() {
+func InitWebhook(providername string, secretList *string, envname string) func() {
 	return func() {
-		if "" == *secret {
-			*secret = os.Getenv(envname)
-		}
-		if "" == *secret {
-			fmt.Fprintf(os.Stderr, "skipped route for missing %s\n", envname)
+		secrets := webhooks.ParseSecrets(providername, *secretList, envname)
+		if 0 == len(secrets) {
+			fmt.Fprintf(os.Stderr, "skipped route for missing %q\n", envname)
 			return
 		}
-		secretB := []byte(*secret)
+
 		webhooks.AddRouteHandler(providername, func(router chi.Router) {
 			router.Post("/", func(w http.ResponseWriter, r *http.Request) {
 				r.Body = http.MaxBytesReader(w, r.Body, options.DefaultMaxBodySize)
 
 				accessToken := r.URL.Query().Get("access_token")
-				if "" != accessToken {
-					if 0 == subtle.ConstantTimeCompare(
-						[]byte(r.URL.Query().Get("access_token")),
-						secretB,
-					) {
-						log.Printf("invalid bitbucket access_token\n")
-						http.Error(w, "invalid access_token", http.StatusBadRequest)
+				if len(accessToken) > 0 {
+					var valid bool
+					accessTokenB := []byte(accessToken)
+					for _, secret := range secrets {
+						if 1 == subtle.ConstantTimeCompare(accessTokenB, secret) {
+							valid = true
+							break
+						}
+					}
+					if !valid {
+						log.Printf("invalid %q access_token\n", providername)
+						http.Error(w, fmt.Sprintf("invalid %q access_token", providername), http.StatusBadRequest)
 						return
 					}
 				}
@@ -64,12 +67,19 @@ func InitWebhook(providername string, secret *string, envname string) func() {
 					return
 				}
 
-				if "" == accessToken {
+				if 0 == len(accessToken) {
 					sig := r.Header.Get("X-Hub-Signature")
-					// TODO replace with generic X-Hub-Signature validation
-					if err := github.ValidateSignature(sig, payload, secretB); nil != err {
-						log.Printf("invalid bitbucket signature: error: %s\n", err)
-						http.Error(w, "invalid bitbucket signature", http.StatusBadRequest)
+					for _, secret := range secrets {
+						// TODO replace with generic X-Hub-Signature validation
+						if err = github.ValidateSignature(sig, payload, secret); nil != err {
+							continue
+						}
+						// err = nil
+						break
+					}
+					if nil != err {
+						log.Printf("invalid %q signature: error: %s\n", providername, err)
+						http.Error(w, fmt.Sprintf("invalid %q signature", providername), http.StatusBadRequest)
 						return
 					}
 				}
