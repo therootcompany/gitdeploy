@@ -1,4 +1,4 @@
-# [gitdeploy](https://git.rootprojects.org/root/gitdeploy)
+# [gitdeploy](https://github.com/therootcompany/gitdeploy)
 
 **gitdeploy** is an app for handling continuous deployment of static websites.
 
