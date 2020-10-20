@@ -39,7 +39,7 @@ curl -sS https://webinstall.dev/gitdeploy | bash
 **Windows 10**:
 
 ```bash
-curl -A MS https://webinstall.dev/gitdeploy | bash
+curl -A MS https://webinstall.dev/gitdeploy | powershell
 ```
 
 ## Setup with Deploy Scripts
