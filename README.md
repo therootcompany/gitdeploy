@@ -1,25 +1,74 @@
 # [gitdeploy](https://git.rootprojects.org/root/gitdeploy)
 
-**gitdeploy** is an app for handling continuous deployment of static websites.
+**gitdeploy** is an app for continuous deployment of static websites.
+
+## Features
+
+**gitdeploy** is intended for use with static websites that are generated after
+changes are pushed to a Git repository. This works with sites that are being
+edited in code and tracked in Git. Sites that have their content managed with a
+headless CMS that pushes to Git are also very well-suited.
+
+**gitdeploy** supports verified webhooks from Github, Bitbucket, and Gitea.
+
+**gitdeploy** is written in Go. This means that it's a standalone binary
+available on all major operating systems and architectures. It provides an API
+with endpoints that handle webhooks, allow for initiation of builds, and getting
+the status of builds and build jobs.
+
+**gitdeploy** comes with a simple interface. The interface be disabled if you
+don't want to use it.
 
 ## Usage
 
 ```bash
-echo 'GITHUB_SECRET=xxxxxxx' >> .env
-./gitdeploy init
-./gitdeploy run --listen :3000 --serve-path ./public_overrides --exec ./path/to/scripts/dir/
+gitdeploy run --listen :3000 --serve-path ./public_overrides --exec ./scripts/
 ```
 
-Note: If you have mulitple webhook secrets - such as different repos with the same provider -
-you should put them in a comma-separated list, such as `GITHUB_SECRET=xxxxxxx,yyyyyyy`.
+## Install
 
-To manage `git credentials` see [The Vanilla DevOps Git Credentials Cheatsheet][1]
+You can download `gitdeploy` from the Github Releases API and place it in your PATH,
+or install it with Webi:
 
-[1]: https://coolaj86.com/articles/vanilla-devops-git-credentials-cheatsheet/
+**Mac**, **Linux**:
 
-## Git Info
+```bash
+curl -sS https://webinstall.dev/gitdeploy | bash
+```
 
-The exec script will receive the parent environment as well as
+**Windows 10**:
+
+```bash
+curl -A MS https://webinstall.dev/gitdeploy | bash
+```
+
+## Setup with Deploy Scripts
+
+Start by copying from `examples/` to `scripts/`.
+
+```bash
+rsync -av examples/ scripts/
+```
+
+```txt
+scripts/
+├── deploy.sh
+├── git.example.com/org/go-project/deploy.sh
+├── git.example.com/org/node-project/deploy.sh
+├── git.example.com/org/mirror-project/deploy.sh
+└── promote.sh
+```
+
+The default `deploy.sh` is sensible -
+if another `deploy.sh` exists in a directory with the same repo name
+as an incoming webhook, it runs it.
+
+The example deploy scripts are a good start, but you'll probably
+need to update them to suit your build process for your project.
+
+### Git Info
+
+These ENVs are set before each script is run:
 
 ```bash
 GIT_DEPLOY_JOB_ID=xxxxxx
@@ -29,8 +78,6 @@ GIT_REPO_OWNER=example
 GIT_REPO_NAME=example
 GIT_CLONE_URL=https://github.com/example/example
 ```
-
-You can see examples in `examples/git.example.com/org`
 
 ## API
 
@@ -65,6 +112,8 @@ POST /api/admin/webhooks/{github,gitea,bitbucket}
 
 ## Build
 
+**Frontend**:
+
 ```bash
 pushd html/
   npm ci
@@ -72,9 +121,20 @@ pushd html/
 popd
 ```
 
+**API**:
+
+With [GoReleaser](https://webinstall.dev/goreleaser):
+
 ```bash
-go mod tidy
-go mod vendor
+goreleaser --snapshot --skip-publish --rm-dist
+```
+
+With [Golang](https://webinstall.dev/golang):
+
+```bash
+export GOFLAGS="-mod=vendor"
+
+go run -mod=vendor git.rootprojects.org/root/go-gitver/v2
 go generate -mod=vendor ./...
 go build -mod=vendor .
 ```
@@ -134,28 +194,6 @@ Title: gitdeploy
 URL: https://YOUR_DOMAIN/api/webhooks/bitbucket?access_token=YOUR_SECRET
 Triggers: Repository push
 ```
-
-## TODO
-
-**gitdeploy** is intended for use with static websites that are generated after
-changes are pushed to a Git repository. This works with sites that are being
-edited in code and tracked in Git. Sites that have their content managed with a
-headless CMS that pushes to Git are also very well-suited.
-
-**gitdeploy** supports verified webhooks from Github, Bitbucket, and Gitea.
-
-**gitdeploy** is written in Go. This means that it's a standalone binary
-available on all major operating systems and architectures. It provides an API
-with endpoints that handle webhooks, allow for initiation of builds, and getting
-the status of builds and build jobs.
-
-**gitdeploy** comes with a simple interface. The interface be disabled if you
-don't want to use it.
-
-**gitdeploy** also comes with basic authentication via integration with
-[Pocket ID](https://pocketid.app). Authentication can also be disabled if you
-don't want to use it. The built-in interface requires the built-in
-authentication.
 
 ## How to Generate a Base64 Secret
 

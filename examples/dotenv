@@ -1,4 +1,13 @@
+# PORT only listens on localhost
 PORT=4483
-GITHUB_SECRET=xxxxxxxxxxxxxxxxxxxxxx
+
+# LISTEN lets you choose the interface also
+#LISTEN=0.0.0.0:4483
+
+# List promotions in descending order
+PROMOTIONS="production staging master"
+
+# List your various webhook secrets
+GITHUB_SECRET=xxxxxxxxxxxxxxxxxxxxxx,yyyyyyyyyyyyyyyyyy
 GITEA_SECRET=xxxxxxxxxxxxxxxxxxxxxx
 BITBUCKET_SECRET=xxxxxxxxxxxxxxxxxxxxxx

@@ -30,16 +30,15 @@ var (
 )
 
 func usage() {
-	ver()
+	fmt.Println(ver())
 	fmt.Println("")
-	fmt.Println("Use 'help <command>'")
-	fmt.Println("  help")
+	fmt.Printf("Use '%s help <command>'\n", name)
 	fmt.Println("  init")
 	fmt.Println("  run")
 }
 
-func ver() {
-	fmt.Printf("%s v%s %s (%s)\n", name, version, commit[:7], date)
+func ver() string {
+	return fmt.Sprintf("%s v%s %s (%s)", name, version, commit[:7], date)
 }
 
 type job struct {
@@ -78,13 +77,22 @@ func init() {
 }
 
 func main() {
+	// Support [--]version and -V
+	if len(os.Args) > 1 {
+		if "version" == strings.TrimLeft(os.Args[1], "-") || "-V" == os.Args[1] {
+			fmt.Println(ver())
+			os.Exit(0)
+			return
+		}
+	}
+
 	args := os.Args[:]
 	if 1 == len(args) {
 		// "run" should be the default
 		args = append(args, "run")
 	}
 
-	if "help" == args[1] {
+	if "help" == strings.TrimLeft(args[1], "-") {
 		// top-level help
 		if 2 == len(args) {
 			usage()
@@ -99,7 +107,7 @@ func main() {
 
 	switch args[1] {
 	case "version":
-		ver()
+		fmt.Println(ver())
 		os.Exit(0)
 		return
 	case "init":
@@ -191,6 +199,23 @@ func serve() {
 
 	webhooks.RouteHandlers(r)
 
+	r.Get("/version", func(w http.ResponseWriter, r *http.Request) {
+		w.Write(append([]byte(ver()), '\n'))
+	})
+	r.Get("/api/version", func(w http.ResponseWriter, r *http.Request) {
+		b, _ := json.MarshalIndent(struct {
+			Name    string `json:"name"`
+			Version string `json:"version"`
+			Date    string `json:"date"`
+			Commit  string `json:"commit"`
+		}{
+			Name:    name,
+			Version: version,
+			Date:    date,
+			Commit:  commit,
+		}, "", "  ")
+		w.Write(append(b, '\n'))
+	})
 	r.Route("/api/admin", func(r chi.Router) {
 		r.Use(func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
