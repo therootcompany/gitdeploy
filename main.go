@@ -38,7 +38,7 @@ func usage() {
 }
 
 func ver() string {
-	return fmt.Sprintf("%s v%s %s (%s)", name, version, commit[:7], date)
+	return fmt.Sprintf("%s v%s (%s) %s", name, version, commit[:7], date)
 }
 
 type job struct {
