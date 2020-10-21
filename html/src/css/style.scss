@@ -22,7 +22,7 @@ $navbar-breakpoint: 0;
 
 html,
 body {
-	background-color: darken($white, 2.5);
+  background-color: darken($white, 2.5);
 }
 
 // sticky footer
@@ -30,23 +30,23 @@ html,
 body,
 #app,
 .app {
-	height: 100%;
+  height: 100%;
 }
 .app {
-	display: flex;
-	flex-direction: column;
+  display: flex;
+  flex-direction: column;
 }
 .main {
-	flex: 1 0 auto;
+  flex: 1 0 auto;
 }
 
 .navbar {
-	margin-bottom: 2rem;
-	background-color: darken($white, 7.5);
-	font-size: (14/16) * 1rem;
+  margin-bottom: 2rem;
+  background-color: darken($white, 7.5);
+  font-size: (14/16) * 1rem;
 }
 .navbar-item {
-	padding: 1.5rem 1rem;
+  padding: 1.5rem 1rem;
 }
 a.navbar-item:focus,
 a.navbar-item:focus-within,
@@ -56,78 +56,78 @@ a.navbar-item.is-active,
 .navbar-link:focus-within,
 .navbar-link:hover,
 .navbar-link.is-active {
-	background-color: darken($white, 2.5);
+  background-color: darken($white, 2.5);
 }
 // navbar brand left space override
 .navbar > .container .navbar-brand,
 .container > .navbar .navbar-brand {
-	margin-left: -0.75rem;
+  margin-left: -0.75rem;
 }
 .x-footer {
-	flex-shrink: 0;
+  flex-shrink: 0;
 }
 .x-footer {
-	padding-top: 1rem;
-	padding-bottom: 1rem;
-	background-color: darken($white, 7.5);
-	p {
-		font-size: (12/16) * 1rem;
-		line-height: 2rem;
-	}
-	.column.x-l {
-		text-align: center;
-	}
-	.column.x-r {
-		text-align: center;
-	}
-	@include tablet {
-		.column.x-l {
-			text-align: left;
-		}
-		.column.x-r {
-			text-align: right;
-		}
-	}
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+  background-color: darken($white, 7.5);
+  p {
+    font-size: (12/16) * 1rem;
+    line-height: 2rem;
+  }
+  .column.x-l {
+    text-align: center;
+  }
+  .column.x-r {
+    text-align: center;
+  }
+  @include tablet {
+    .column.x-l {
+      text-align: left;
+    }
+    .column.x-r {
+      text-align: right;
+    }
+  }
 }
 .hero.is-fullheight.signin {
-	background-color: darken($white, 2.5);
-	min-height: calc(100vh - 4rem);
+  background-color: darken($white, 2.5);
+  min-height: calc(100vh - 4rem);
 }
 .button.continue {
-	width: 100%;
+  width: 100%;
 }
 .signin-info p {
-	font-size: (14/16) * 1rem;
+  font-size: (14/16) * 1rem;
 }
 .signin {
-	.box {
-		padding-right: $golden * 1rem;
-		padding-bottom: 2rem;
-		padding-left: $golden * 1rem;
-	}
-	.column {
-		max-width: 26rem;
-	}
+  .box {
+    padding-right: $golden * 1rem;
+    padding-bottom: 2rem;
+    padding-left: $golden * 1rem;
+  }
+  .column {
+    max-width: 26rem;
+  }
 }
 
 [v-cloak] {
-	@extend .is-hidden;
+  @extend .is-hidden;
 }
 
 .page-loader {
-	width: 100%;
-	height: 100%;
-	display: flex;
-	justify-content: center;
-	align-items: center;
-	span {
-		@include loader;
-		width: 3rem;
-		height: 3rem;
-		border-width: 0.3rem;
-	}
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  span {
+    @include loader;
+    width: 3rem;
+    height: 3rem;
+    border-width: 0.3rem;
+  }
 }
 
 .jobs pre {
-	padding: 0;
+  padding: 0;
 }

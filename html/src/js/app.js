@@ -1,13 +1,13 @@
-'use strict';
+"use strict";
 
-require('../css/style.scss');
+require("../css/style.scss");
 
-var Vue = require('vue').default;
-var app = require('./app.vue').default;
+var Vue = require("vue").default;
+var app = require("./app.vue").default;
 
 new Vue({
-	el: '#app',
-	components: {
-		app: app
-	}
+  el: "#app",
+  components: {
+    app: app,
+  },
 });
