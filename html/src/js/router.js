@@ -7,7 +7,7 @@ var components = {
 	dashboard: require('./components/dashboard.vue').default,
 	notFound: require('./components/not-found.vue').default,
 	jobs: require('./components/jobs.vue').default,
-	sites: require('./components/sites.vue').default,
+	repos: require('./components/repos.vue').default,
 	footer: require('./components/footer.vue').default
 };
 
@@ -30,10 +30,10 @@ var router = new VueRouter({
 			}
 		},
 		{
-			path: '/sites',
+			path: '/repos',
 			components: {
 				header: components.navbar,
-				main: components.sites,
+				main: components.repos,
 				footer: components.footer
 			}
 		},

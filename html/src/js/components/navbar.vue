@@ -9,7 +9,9 @@
 			<div class="navbar-menu">
 				<div class="navbar-start">
 					<router-link class="navbar-item" to="/">Dashboard</router-link>
-					<router-link class="navbar-item" to="/sites">Sites</router-link>
+					<router-link class="navbar-item" to="/repos"
+						>Repositories</router-link
+					>
 					<router-link class="navbar-item" to="/jobs">Jobs</router-link>
 				</div>
 			</div>
