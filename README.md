@@ -53,7 +53,7 @@ Usage of gitdeploy run:
 ## Install
 
 You can download `gitdeploy` from the Github Releases API and place it in your PATH,
-or install it with Webi:
+or install it with [Webi](https://webinstall.dev) ([webinstall.dev](https://webinstall.dev)):
 
 **Mac**, **Linux**:
 
