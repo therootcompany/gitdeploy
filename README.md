@@ -80,6 +80,7 @@ GIT_REF_NAME=master
 GIT_REF_TYPE=branch
 GIT_REPO_OWNER=my-org
 GIT_REPO_NAME=my-project
+GIT_REPO_TRUSTED=true
 ```
 
 ## API

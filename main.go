@@ -150,7 +150,11 @@ func main() {
 			return
 		}
 		if 0 == len(runOpts.RepoList) {
-			runOpts.RepoList = os.Getenv("REPO_LIST")
+			runOpts.RepoList = os.Getenv("TRUST_REPOS")
+		}
+		if len(runOpts.RepoList) > 0 {
+			runOpts.RepoList = strings.ReplaceAll(runOpts.RepoList, ",", " ")
+			runOpts.RepoList = strings.ReplaceAll(runOpts.RepoList, "  ", " ")
 		}
 		if 0 == len(promotionList) {
 			promotionList = os.Getenv("PROMOTIONS")
@@ -445,6 +449,12 @@ func runHook(hook webhooks.Ref) {
 		"GIT_REPO_OWNER=" + hook.Owner,
 		"GIT_REPO_NAME=" + hook.Repo,
 		"GIT_CLONE_URL=" + hook.HTTPSURL,
+	}
+	for _, repo := range strings.Fields(runOpts.RepoList) {
+		if "*" == repo || repo == repoID {
+			envs = append(envs, "GIT_REPO_TRUSTED=true")
+			break
+		}
 	}
 	cmd.Env = append(env, envs...)
 	cmd.Stdout = os.Stdout

@@ -1,5 +1,6 @@
 #!/bin/bash
 set -u
+set -e
 
 if [[ "${GIT_REF_NAME}" != "master" ]]
 then
