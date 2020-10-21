@@ -5,30 +5,7 @@
 				<router-view name="header" :user="user"></router-view>
 				<router-view name="main" :user="user"></router-view>
 			</div>
-			<div class="x-footer">
-				<div class="container is-fluid">
-					<div class="columns">
-						<div class="column x-l">
-							<p>
-								<a
-									href="https://github.com/therootcompany/gitdeploy"
-									target="_blank"
-								>
-									gitdeploy
-								</a>
-								v0.1.0
-							</p>
-						</div>
-						<div class="column x-r">
-							<p>
-								<button v-if="signedIn" class="button is-small">
-									Sign Out
-								</button>
-							</p>
-						</div>
-					</div>
-				</div>
-			</div>
+			<router-view name="footer" :user="user"></router-view>
 		</template>
 		<template v-else>
 			<div class="page-loader">

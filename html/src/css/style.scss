@@ -1,3 +1,5 @@
+@import '~bulma/sass/utilities/initial-variables.sass';
+
 // numbers
 $golden: 1.618;
 
@@ -7,6 +9,14 @@ $link: $primary;
 
 // fonts
 $family-primary: 'Open Sans', Arial, sans-serif;
+
+// breakpoints
+$mobile-enabled: false;
+$tablet-enabled: false;
+$desktop-enabled: false;
+$widescreen-enabled: false;
+$fullhd-enabled: false;
+$navbar-breakpoint: 0;
 
 @import 'bulma/bulma';
 
@@ -36,8 +46,7 @@ body,
 	font-size: (14/16) * 1rem;
 }
 .navbar-item {
-	padding-top: 1.25rem;
-	padding-bottom: 1.25rem;
+	padding: 1.5rem 1rem;
 }
 a.navbar-item:focus,
 a.navbar-item:focus-within,
@@ -117,4 +126,8 @@ a.navbar-item.is-active,
 		height: 3rem;
 		border-width: 0.3rem;
 	}
+}
+
+.jobs pre {
+	padding: 0;
 }

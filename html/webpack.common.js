@@ -8,7 +8,7 @@ var VueLoaderPlugin = require('vue-loader/lib/plugin');
 module.exports = {
 	context: path.resolve(__dirname, 'src'),
 	entry: {
-		vendor: ['vue', 'vue-router', 'axios'],
+		vendor: ['vue', 'vue-router', 'axios', 'set-interval-async'],
 		app: {
 			import: './js/app.js',
 			dependOn: 'vendor'
@@ -54,7 +54,11 @@ module.exports = {
 		alias: {
 			bulma: path.resolve(__dirname, 'node_modules/bulma'),
 			axios: path.resolve(__dirname, 'node_modules/axios/dist/axios.js'),
-			vue$: 'vue/dist/vue.esm.js'
+			vue$: 'vue/dist/vue.esm.js',
+			'set-interval-async': path.resolve(
+				__dirname,
+				'node_modules/set-interval-async/dist/set-interval-async.cjs.js'
+			)
 		}
 	}
 };
