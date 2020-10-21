@@ -62,12 +62,15 @@ var oldScripts string
 
 func init() {
 	runOpts = options.Server
-	runFlags = options.ServerFlags
+
 	initFlags = options.InitFlags
+	_ = initFlags.Bool("TODO", false, "init will eventually copy default assets into a local directory")
+
+	runFlags = options.ServerFlags
 	runFlags.StringVar(&runOpts.Addr, "listen", "", "the address and port on which to listen (default :4483)")
 	runFlags.BoolVar(&runOpts.TrustProxy, "trust-proxy", false, "trust X-Forwarded-For header")
 	runFlags.StringVar(&runOpts.RepoList, "trust-repos", "",
-		"run '.gitdeploy/deploy.sh' directly from these repos if no local script is present (example: 'git.example.com/org/repo')")
+		"list of repos (ex: 'github.com/org/repo', or '*' for all) for which to run '.gitdeploy/deploy.sh'")
 	runFlags.BoolVar(&runOpts.Compress, "compress", true, "enable compression for text,html,js,css,etc")
 	runFlags.StringVar(
 		&runOpts.ServePath, "serve-path", "",
@@ -76,7 +79,7 @@ func init() {
 		&oldScripts, "exec", "",
 		"old alias for --scripts")
 	runFlags.StringVar(
-		&runOpts.Exec, "scripts", "",
+		&runOpts.ScriptsPath, "scripts", "",
 		"path to ./scripts/{deploy.sh,promote.sh,etc}")
 	//"path to bash script to run with git info as arguments")
 	runFlags.StringVar(&promotionList, "promotions", "",
@@ -119,16 +122,19 @@ func main() {
 		return
 	case "init":
 		_ = initFlags.Parse(args[2:])
+		fmt.Fprintf(os.Stderr, "%s init: not implemented\n", name)
+		os.Exit(0)
+		return
 	case "run":
 		_ = runFlags.Parse(args[2:])
-		if "" == runOpts.Exec {
+		if "" == runOpts.ScriptsPath {
 			if "" != oldScripts {
 				fmt.Fprintf(os.Stderr, "--exec is deprecated and will be removed. Please use --scripts instead.\n")
-				runOpts.Exec = oldScripts
+				runOpts.ScriptsPath = oldScripts
 			}
 		}
-		if "" == runOpts.Exec {
-			runOpts.Exec = "./scripts"
+		if "" == runOpts.ScriptsPath {
+			runOpts.ScriptsPath = "./scripts"
 			pathname, _ := filepath.Abs("./scripts")
 			if info, _ := os.Stat("./scripts/deploy.sh"); nil == info || !info.Mode().IsRegular() {
 				fmt.Printf(
@@ -265,7 +271,7 @@ func serve() {
 					Promotions: promotions,
 				})
 			}
-			err := filepath.Walk(runOpts.Exec, func(path string, info os.FileInfo, err error) error {
+			err := filepath.Walk(runOpts.ScriptsPath, func(path string, info os.FileInfo, err error) error {
 				if nil != err {
 					fmt.Printf("error walking %q: %v\n", path, err)
 					return nil
@@ -276,7 +282,7 @@ func serve() {
 					return nil
 				}
 				path = strings.Join(parts[1:], "/")
-				if info.Mode().IsRegular() && "deploy.sh" == info.Name() && runOpts.Exec != path {
+				if info.Mode().IsRegular() && "deploy.sh" == info.Name() && runOpts.ScriptsPath != path {
 					id := filepath.Dir(path)
 					repos = append(repos, Repo{
 						ID:         id,
@@ -424,7 +430,7 @@ func runHook(hook webhooks.Ref) {
 	))
 
 	args := []string{
-		runOpts.Exec + "/deploy.sh",
+		runOpts.ScriptsPath + "/deploy.sh",
 		jobID,
 		hook.RefName,
 		hook.RefType,
@@ -517,7 +523,7 @@ func runPromote(hook webhooks.Ref, promoteTo string) {
 	))
 
 	args := []string{
-		runOpts.Exec + "/promote.sh",
+		runOpts.ScriptsPath + "/promote.sh",
 		jobID1,
 		promoteTo,
 		hook.RefName,

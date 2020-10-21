@@ -22,7 +22,32 @@ don't want to use it.
 ## Usage
 
 ```bash
-gitdeploy run --listen :3000 --serve-path ./public_overrides --exec ./scripts/
+gitdeploy init
+gitdeploy run --listen :3000 --scripts ./scripts/
+```
+
+```txt
+Usage of gitdeploy run:
+  -listen string
+    	the address and port on which to listen (default :4483)
+  -github-secret string
+    	secret for github webhooks (same as GITHUB_SECRET=)
+  -bitbucket-secret string
+    	secret for bitbucket webhooks (same as BITBUCKET_SECRET=)
+  -gitea-secret string
+    	secret for gitea webhooks (same as GITEA_SECRET=)
+  -scripts string
+    	path to ./scripts/{deploy.sh,promote.sh,etc}
+  -trust-repos string
+    	list of repos (ex: 'github.com/org/repo', or '*' for all) for which to run '.gitdeploy/deploy.sh'
+  -compress
+    	enable compression for text,html,js,css,etc (default true)
+  -promotions string
+    	a list of promotable branches in descending order (default 'production,staging,master')
+  -serve-path string
+    	path to serve, falls back to built-in web app
+  -trust-proxy
+    	trust X-Forwarded-For header
 ```
 
 ## Install
@@ -65,6 +90,21 @@ as an incoming webhook, it runs it.
 
 The example deploy scripts are a good start, but you'll probably
 need to update them to suit your build process for your project.
+
+### In-repo .gitdeploy scripts
+
+A repo my have its own `.gitdeploy/deploy.sh` at its root, but by default these are ignored.
+
+You can set `--trust-repos` (or `TRUST_REPOS`) to allow deploy scripts to be run directly
+from a repository.
+
+```bash
+# trust a few repos to run their own deploy scripts
+gitdeploy run --listen :3000 --trust-repos 'github.com/org/one,github.com/org/two'
+
+# trust all repos
+gitdeploy run --listen :3000 --trust-repos '*'
+```
 
 ### Git Info
 
