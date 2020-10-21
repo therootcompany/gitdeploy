@@ -7,6 +7,11 @@ PORT=4483
 # List promotions in descending order
 PROMOTIONS="production staging master"
 
+TRUST_PROXY=false
+
+# These repos will be trusted to run .gitdeploy/deploy.sh
+TRUST_REPOS=git.example.com/org/project,git.example.com/org/other-project
+
 # List your various webhook secrets
 GITHUB_SECRET=xxxxxxxxxxxxxxxxxxxxxx,yyyyyyyyyyyyyyyyyy
 GITEA_SECRET=xxxxxxxxxxxxxxxxxxxxxx

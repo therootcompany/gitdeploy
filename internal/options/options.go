@@ -9,6 +9,7 @@ var Server *ServerConfig
 type ServerConfig struct {
 	Addr       string
 	TrustProxy bool
+	RepoList   string
 	Compress   bool
 	ServePath  string
 	Exec       string

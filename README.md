@@ -71,12 +71,15 @@ need to update them to suit your build process for your project.
 These ENVs are set before each script is run:
 
 ```bash
+GIT_REPO_ID=github.com/my-org/my-project
+
+GIT_CLONE_URL=https://github.com/my-org/my-project.git
+
 GIT_DEPLOY_JOB_ID=xxxxxx
 GIT_REF_NAME=master
 GIT_REF_TYPE=branch
-GIT_REPO_OWNER=example
-GIT_REPO_NAME=example
-GIT_CLONE_URL=https://github.com/example/example
+GIT_REPO_OWNER=my-org
+GIT_REPO_NAME=my-project
 ```
 
 ## API

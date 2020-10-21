@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -57,6 +58,7 @@ var initFlags *flag.FlagSet
 var promotions []string
 var promotionList string
 var defaultPromotionList = "production,staging,master"
+var oldScripts string
 
 func init() {
 	runOpts = options.Server
@@ -64,12 +66,17 @@ func init() {
 	initFlags = options.InitFlags
 	runFlags.StringVar(&runOpts.Addr, "listen", "", "the address and port on which to listen (default :4483)")
 	runFlags.BoolVar(&runOpts.TrustProxy, "trust-proxy", false, "trust X-Forwarded-For header")
+	runFlags.StringVar(&runOpts.RepoList, "trust-repos", "",
+		"run '.gitdeploy/deploy.sh' directly from these repos if no local script is present (example: 'git.example.com/org/repo')")
 	runFlags.BoolVar(&runOpts.Compress, "compress", true, "enable compression for text,html,js,css,etc")
 	runFlags.StringVar(
 		&runOpts.ServePath, "serve-path", "",
 		"path to serve, falls back to built-in web app")
 	runFlags.StringVar(
-		&runOpts.Exec, "exec", "",
+		&oldScripts, "exec", "",
+		"old alias for --scripts")
+	runFlags.StringVar(
+		&runOpts.Exec, "scripts", "",
 		"path to ./scripts/{deploy.sh,promote.sh,etc}")
 	//"path to bash script to run with git info as arguments")
 	runFlags.StringVar(&promotionList, "promotions", "",
@@ -115,20 +122,35 @@ func main() {
 	case "run":
 		_ = runFlags.Parse(args[2:])
 		if "" == runOpts.Exec {
-			fmt.Printf("--exec <path/to/scripts/> is a required flag")
-			os.Exit(1)
-			return
+			if "" != oldScripts {
+				fmt.Fprintf(os.Stderr, "--exec is deprecated and will be removed. Please use --scripts instead.\n")
+				runOpts.Exec = oldScripts
+			}
+		}
+		if "" == runOpts.Exec {
+			runOpts.Exec = "./scripts"
+			pathname, _ := filepath.Abs("./scripts")
+			if info, _ := os.Stat("./scripts/deploy.sh"); nil == info || !info.Mode().IsRegular() {
+				fmt.Printf(
+					"%q not found.\nPlease provide --scripts ./scripts/ as a path where \"deploy.sh\" can be found\n",
+					pathname,
+				)
+				os.Exit(1)
+			}
 		}
 		if 0 == len(runOpts.Addr) {
 			runOpts.Addr = os.Getenv("LISTEN")
 		}
 		if 0 == len(runOpts.Addr) {
-			runOpts.Addr = "localhost:" + os.Getenv("PORT")
+			runOpts.Addr = "localhost:4483"
 		}
 		if 0 == len(runOpts.Addr) {
 			fmt.Printf("--listen <[addr]:port> is a required flag")
 			os.Exit(1)
 			return
+		}
+		if 0 == len(runOpts.RepoList) {
+			runOpts.RepoList = os.Getenv("REPO_LIST")
 		}
 		if 0 == len(promotionList) {
 			promotionList = os.Getenv("PROMOTIONS")
@@ -227,6 +249,50 @@ func serve() {
 			})
 		})
 
+		r.Get("/repos", func(w http.ResponseWriter, r *http.Request) {
+			repos := []Repo{}
+
+			for _, id := range strings.Fields(
+				strings.ReplaceAll(runOpts.RepoList, ",", " "),
+			) {
+				repos = append(repos, Repo{
+					ID:         id,
+					CloneURL:   fmt.Sprintf("https://%s.git", id),
+					Promotions: promotions,
+				})
+			}
+			err := filepath.Walk(runOpts.Exec, func(path string, info os.FileInfo, err error) error {
+				if nil != err {
+					fmt.Printf("error walking %q: %v\n", path, err)
+					return nil
+				}
+				fmt.Println("path:", path, "name:", info.Name())
+				parts := strings.Split(filepath.ToSlash(path), "/")
+				if len(parts) < 3 {
+					return nil
+				}
+				path = strings.Join(parts[1:], "/")
+				if info.Mode().IsRegular() && "deploy.sh" == info.Name() && runOpts.Exec != path {
+					id := filepath.Dir(path)
+					repos = append(repos, Repo{
+						ID:         id,
+						CloneURL:   fmt.Sprintf("https://%s.git", id),
+						Promotions: promotions,
+					})
+				}
+				return nil
+			})
+			if nil != err {
+				http.Error(w, "the scripts directory disappeared", http.StatusInternalServerError)
+				return
+			}
+			b, _ := json.MarshalIndent(ReposResponse{
+				Success: true,
+				Repos:   repos,
+			}, "", "  ")
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(append(b, '\n'))
+		})
 		r.Get("/jobs", func(w http.ResponseWriter, r *http.Request) {
 			// again, possible race condition, but not one that much matters
 			jjobs := []Job{}
@@ -503,4 +569,17 @@ func runPromote(hook webhooks.Ref, promoteTo string) {
 		log.Printf("gitdeploy promote for %s#%s finished\n", hook.HTTPSURL, hook.RefName)
 		// TODO check for backlog
 	}()
+}
+
+// ReposResponse is the successful response to /api/repos
+type ReposResponse struct {
+	Success bool   `json:"success"`
+	Repos   []Repo `json:"repos"`
+}
+
+// Repo is one of the elements of /api/repos
+type Repo struct {
+	ID         string   `json:"id"`
+	CloneURL   string   `json:"clone_url"`
+	Promotions []string `json:"_promotions"`
 }
