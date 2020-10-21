@@ -270,7 +270,7 @@ func serve() {
 					fmt.Printf("error walking %q: %v\n", path, err)
 					return nil
 				}
-				fmt.Println("path:", path, "name:", info.Name())
+				// "scripts/github.com/org/repo"
 				parts := strings.Split(filepath.ToSlash(path), "/")
 				if len(parts) < 3 {
 					return nil
