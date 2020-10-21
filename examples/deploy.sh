@@ -4,7 +4,7 @@
 base_dir="$(dirname "$(readlink -f "$0")")"
 
 function deploy_local() {
-    echo "Running deplay script for ${GIT_REPO_ID}"
+    echo "Running deploy script for ${GIT_REPO_ID}"
     bash -o errexit -o nounset "${base_dir}/${GIT_REPO_ID}/deploy.sh"
 }
 
