@@ -4,10 +4,10 @@
       <div class="title">
         <h2 class="has-text-weight-bold">Repositories</h2>
       </div>
-      <div class="block site" v-for="r in repositories">
+      <pre>{{ repos }}</pre>
+      <div class="block site" v-for="r in repos">
         <div class="title">
           <h3 class="has-text-weight-bold">{{ r.id }}</h3>
-          ... promote
           <p>
             <button
               class="button is-primary"
@@ -23,21 +23,23 @@
 </template>
 
 <script>
-var axios = require("axios");
+var axios = require('axios');
 
 module.exports = {
-  name: "repos",
+  name: 'repos',
   data: function () {
     return {
-      repos: [],
+      repos: []
     };
   },
   methods: {
     getRepos: function () {
       var _this = this;
 
-      return axios.get("/api/admin/repos").then(function (resp) {
-        _this.repos = resp.data;
+      return axios.get('/api/admin/repos').then(function (resp) {
+        if (resp.data.success) {
+          _this.repos = resp.data.repos;
+        }
       });
     },
     promote: function (ev, ref_name) {
@@ -45,18 +47,18 @@ module.exports = {
         ev.preventDefault();
       }
 
-      if (window.confirm("Are you sure you want to promote master?")) {
-        axios.post("/api/admin/promote", {
-          clone_url: "https://...",
-          ref_name: ref_name,
+      if (window.confirm('Are you sure you want to promote master?')) {
+        axios.post('/api/admin/promote', {
+          clone_url: 'https://...',
+          ref_name: ref_name
         });
       }
-    },
+    }
   },
   created: function () {
     var _this = this;
 
     _this.getRepos();
-  },
+  }
 };
 </script>

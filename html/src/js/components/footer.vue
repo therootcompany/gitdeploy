@@ -15,7 +15,7 @@
         </div>
         <div class="column x-r">
           <p>
-            <button v-if="signedIn" class="button is-small">Sign Out</button>
+            <button class="button is-small">Sign Out</button>
           </p>
         </div>
       </div>
@@ -24,28 +24,27 @@
 </template>
 
 <script>
-var axios = require("axios");
+var axios = require('axios');
 
 module.exports = {
-  name: "footer",
   data: function () {
     return {
-      version: "",
+      version: ''
     };
   },
   methods: {
     getVersion: function () {
       var _this = this;
 
-      axios.get("/api/version").then(function (resp) {
+      axios.get('/api/version').then(function (resp) {
         _this.version = resp.data.version;
       });
-    },
+    }
   },
   created: function () {
     var _this = this;
 
     _this.getVersion();
-  },
+  }
 };
 </script>
