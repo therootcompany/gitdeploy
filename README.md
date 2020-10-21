@@ -200,7 +200,7 @@ Supported tags are:
 sudo env PATH="$PATH" \
   serviceman add --name gitdeploy --system \
     --username app -path "$PATH" -- \
-    gitdeploy run --exec ./scripts/
+    gitdeploy run --scripts ./scripts/
 ```
 
 ## Add Webhooks
