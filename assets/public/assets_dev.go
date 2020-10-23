@@ -1,8 +1,8 @@
 // +build dev
 
-package assets
+package public
 
 import "net/http"
 
 // Assets is the public file system which should be served by http
-var Assets http.FileSystem = http.Dir("../public")
+var Assets http.FileSystem = http.Dir("../../public")

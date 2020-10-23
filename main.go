@@ -14,7 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"git.rootprojects.org/root/gitdeploy/assets"
+	"git.rootprojects.org/root/vfscopy"
+	"git.rootprojects.org/root/gitdeploy/assets/public"
+	"git.rootprojects.org/root/gitdeploy/assets/examples"
 	"git.rootprojects.org/root/gitdeploy/internal/options"
 	"git.rootprojects.org/root/gitdeploy/internal/webhooks"
 
@@ -122,7 +124,29 @@ func main() {
 		return
 	case "init":
 		_ = initFlags.Parse(args[2:])
-		fmt.Fprintf(os.Stderr, "%s init: not implemented\n", name)
+		vfs := vfscopy.NewVFS(examples.Assets)
+		_, err := os.Open("scripts")
+		if nil == err {
+			fmt.Fprintf(os.Stderr, "./scripts already exists\n")
+			os.Exit(1)
+			return
+		}
+		fmt.Println("Copying ...")
+		if err := vfscopy.CopyAll(vfs, ".", "./scripts", vfscopy.Options {
+			Skip: func (path string) (bool, error) {
+				f, _ := vfs.Open(path)
+				fi, _ := f.Stat()
+				if !fi.IsDir() {
+					fmt.Println("    scripts/" + path)
+				}
+				return false, nil
+			},
+		}); nil != err {
+			fmt.Fprintf(os.Stderr, "error initializing ./scripts directory\n")
+			os.Exit(1)
+			return
+		}
+		fmt.Println("Done.")
 		os.Exit(0)
 		return
 	case "run":
@@ -210,7 +234,7 @@ func serve() {
 	r.Use(middleware.Recoverer)
 
 	var staticHandler http.HandlerFunc
-	pub := http.FileServer(assets.Assets)
+	pub := http.FileServer(public.Assets)
 
 	if len(runOpts.ServePath) > 0 {
 		// try the user-provided directory first, then fallback to the built-in
