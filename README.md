@@ -69,10 +69,10 @@ curl -A MS https://webinstall.dev/gitdeploy | powershell
 
 ## Setup with Deploy Scripts
 
-Start by copying from `examples/` to `scripts/`.
+Start by initializing your `./scripts` directory.
 
 ```bash
-rsync -av examples/ scripts/
+gitdeploy init
 ```
 
 ```txt
@@ -192,6 +192,7 @@ go build -mod=vendor -tags nobitbucket,nogithub .
 Supported tags are:
 
 - nogithub
+- nogitea
 - nobitbucket
 
 ## Run as a System Service
