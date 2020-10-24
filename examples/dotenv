@@ -1,5 +1,5 @@
 # PORT only listens on localhost
-PORT=4483
+#PORT=4483
 
 # LISTEN lets you choose the interface also
 #LISTEN=0.0.0.0:4483
@@ -7,12 +7,13 @@ PORT=4483
 # List promotions in descending order
 PROMOTIONS="production staging master"
 
+# Whether to trust X-Forward-* headers
 TRUST_PROXY=false
 
 # These repos will be trusted to run .gitdeploy/deploy.sh
-TRUST_REPOS=git.example.com/org/project,git.example.com/org/other-project
+#TRUST_REPOS=git.example.com/org/project,git.example.com/org/other-project
 
 # List your various webhook secrets
-GITHUB_SECRET=xxxxxxxxxxxxxxxxxxxxxx,yyyyyyyyyyyyyyyyyy
-GITEA_SECRET=xxxxxxxxxxxxxxxxxxxxxx
-BITBUCKET_SECRET=xxxxxxxxxxxxxxxxxxxxxx
+#GITHUB_SECRET=xxxxxxxxxxxxxxxxxxxxxx,yyyyyyyyyyyyyyyyyy
+#GITEA_SECRET=xxxxxxxxxxxxxxxxxxxxxx
+#BITBUCKET_SECRET=xxxxxxxxxxxxxxxxxxxxxx

@@ -14,11 +14,11 @@ import (
 	"strings"
 	"time"
 
-	"git.rootprojects.org/root/vfscopy"
-	"git.rootprojects.org/root/gitdeploy/assets/public"
 	"git.rootprojects.org/root/gitdeploy/assets/examples"
+	"git.rootprojects.org/root/gitdeploy/assets/public"
 	"git.rootprojects.org/root/gitdeploy/internal/options"
 	"git.rootprojects.org/root/gitdeploy/internal/webhooks"
+	"git.rootprojects.org/root/vfscopy"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -124,29 +124,7 @@ func main() {
 		return
 	case "init":
 		_ = initFlags.Parse(args[2:])
-		vfs := vfscopy.NewVFS(examples.Assets)
-		_, err := os.Open("scripts")
-		if nil == err {
-			fmt.Fprintf(os.Stderr, "./scripts already exists\n")
-			os.Exit(1)
-			return
-		}
-		fmt.Println("Copying ...")
-		if err := vfscopy.CopyAll(vfs, ".", "./scripts", vfscopy.Options {
-			Skip: func (path string) (bool, error) {
-				f, _ := vfs.Open(path)
-				fi, _ := f.Stat()
-				if !fi.IsDir() {
-					fmt.Println("    scripts/" + path)
-				}
-				return false, nil
-			},
-		}); nil != err {
-			fmt.Fprintf(os.Stderr, "error initializing ./scripts directory\n")
-			os.Exit(1)
-			return
-		}
-		fmt.Println("Done.")
+		gdInit()
 		os.Exit(0)
 		return
 	case "run":
@@ -170,6 +148,12 @@ func main() {
 		}
 		if 0 == len(runOpts.Addr) {
 			runOpts.Addr = os.Getenv("LISTEN")
+		}
+		if 0 == len(runOpts.Addr) {
+			port := os.Getenv("PORT")
+			if len(port) > 0 {
+				runOpts.Addr = "localhost:" + port
+			}
 		}
 		if 0 == len(runOpts.Addr) {
 			runOpts.Addr = "localhost:4483"
@@ -217,6 +201,50 @@ type Job struct {
 type KillMsg struct {
 	JobID string `json:"job_id"`
 	Kill  bool   `json:"kill"`
+}
+
+func gdInit() {
+	vfs := vfscopy.NewVFS(examples.Assets)
+	_, err := os.Open("scripts")
+	fmt.Println("Initiazing ...")
+	if !os.IsNotExist(err) {
+		fmt.Fprintf(os.Stderr, "    skip: ./scripts already exists\n")
+	} else {
+		if err := vfscopy.CopyAll(vfs, ".", "./scripts", vfscopy.Options{
+			AddPermission: os.FileMode(0600),
+			Skip: func(path string) (bool, error) {
+				if strings.HasSuffix(path, "/dotenv") {
+					return true, nil
+				}
+
+				f, _ := vfs.Open(path)
+				fi, _ := f.Stat()
+				if !fi.IsDir() {
+					fmt.Println("    copy: scripts/" + path)
+				}
+				return false, nil
+			},
+		}); nil != err {
+			fmt.Fprintf(os.Stderr, "error initializing ./scripts directory: %v\n", err)
+			os.Exit(1)
+			return
+		}
+	}
+	_, err = os.Open(".env")
+	if !os.IsNotExist(err) {
+		fmt.Fprintf(os.Stderr, "    skip: ./.env already exists\n")
+	} else {
+		if err := vfscopy.CopyAll(vfs, "dotenv", ".env", vfscopy.Options{
+			AddPermission: os.FileMode(0600),
+		}); nil != err {
+			fmt.Fprintf(os.Stderr, "error initializing ./.env file: %v\n", err)
+			os.Exit(1)
+			return
+		}
+		_ = os.Chmod(".env", 0600)
+		fmt.Println("    copy: .env")
+	}
+	fmt.Println("Done.")
 }
 
 func serve() {

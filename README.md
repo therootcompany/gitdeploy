@@ -67,15 +67,37 @@ curl -sS https://webinstall.dev/gitdeploy | bash
 curl -A MS https://webinstall.dev/gitdeploy | powershell
 ```
 
+## Git SSH Deploy Keys and Tokens
+
+All of the clone URLs are HTTPS clone URLs.
+
+To use SSH clone URLs, you should update your git credentials:
+
+```bash
+git config --global url."ssh://git@github.com/example-org/".insteadOf "https://github.com/example-org/"
+```
+
+This will add an entry like this to your `.gitconfig`:
+
+```ini
+[url "ssh://git@github.com/example-org/"]
+    insteadOf = https://github.com/example-org/
+```
+
+For more info see
+[The Git Credentials Cheat Sheet](https://coolaj86.com/articles/vanilla-devops-git-credentials-cheatsheet/)
+at <https://coolaj86.com/articles/vanilla-devops-git-credentials-cheatsheet/>.
+
 ## Setup with Deploy Scripts
 
-Start by initializing your `./scripts` directory.
+Start by initializing your `.env` and `./scripts` directory.
 
 ```bash
 gitdeploy init
 ```
 
 ```txt
+.env
 scripts/
 ├── deploy.sh
 ├── git.example.com/org/go-project/deploy.sh
