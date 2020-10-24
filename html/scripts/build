@@ -1,4 +1,0 @@
-#!/usr/bin/env bash
-rm -rf dist
-npx webpack --config webpack.production.js -p --colors
-scripts/copy

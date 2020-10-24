@@ -16,6 +16,6 @@
 
 <script>
 module.exports = {
-  name: "dashboard",
+  name: 'dashboard'
 };
 </script>

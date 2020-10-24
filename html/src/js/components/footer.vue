@@ -13,11 +13,6 @@
             v{{ version }}
           </p>
         </div>
-        <div class="column x-r">
-          <p>
-            <button class="button is-small">Sign Out</button>
-          </p>
-        </div>
       </div>
     </div>
   </div>

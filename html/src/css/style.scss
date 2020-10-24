@@ -67,6 +67,7 @@ a.navbar-item.is-active,
   flex-shrink: 0;
 }
 .x-footer {
+  margin-top: 1.5rem;
   padding-top: 1rem;
   padding-bottom: 1rem;
   background-color: darken($white, 7.5);
@@ -127,10 +128,12 @@ a.navbar-item.is-active,
     border-width: 0.3rem;
   }
 }
-
-pre {
-  padding: 0;
-}
-pre:not(:last-child) {
-  margin-bottom: 1.5rem;
+// pre {
+//   padding: 0;
+// }
+// pre:not(:last-child) {
+//   margin-bottom: 1.5rem;
+// }
+.repo-item {
+  padding: 2rem;
 }

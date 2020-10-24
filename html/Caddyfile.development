@@ -1,5 +1,0 @@
-http://localhost:3000 {
-    root * dist/
-    file_server
-    reverse_proxy /api* http://localhost:4483
-}
