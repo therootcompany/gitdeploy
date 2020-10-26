@@ -169,6 +169,7 @@ func main() {
 		if len(runOpts.RepoList) > 0 {
 			runOpts.RepoList = strings.ReplaceAll(runOpts.RepoList, ",", " ")
 			runOpts.RepoList = strings.ReplaceAll(runOpts.RepoList, "  ", " ")
+			runOpts.RepoList = strings.ToLower(runOpts.RepoList)
 		}
 		if 0 == len(promotionList) {
 			promotionList = os.Getenv("PROMOTIONS")
@@ -314,9 +315,7 @@ func serve() {
 		r.Get("/repos", func(w http.ResponseWriter, r *http.Request) {
 			repos := []Repo{}
 
-			for _, id := range strings.Fields(
-				strings.ReplaceAll(runOpts.RepoList, ",", " "),
-			) {
+			for _, id := range strings.Fields(runOpts.RepoList) {
 				repos = append(repos, Repo{
 					ID:         id,
 					CloneURL:   fmt.Sprintf("https://%s.git", id),
@@ -509,7 +508,20 @@ func runHook(hook webhooks.Ref) {
 		"GIT_CLONE_URL=" + hook.HTTPSURL,
 	}
 	for _, repo := range strings.Fields(runOpts.RepoList) {
-		if "*" == repo || repo == repoID {
+		last := len(repo) - 1
+		if len(repo) < 0 {
+			continue
+		}
+		repoID = strings.ToLower(repoID)
+		if '*' == repo[last] {
+			// Wildcard match a prefix, for example:
+			// github.com/whatever/*					MATCHES github.com/whatever/foo
+			// github.com/whatever/ProjectX-* MATCHES github.com/whatever/ProjectX-Foo
+			if strings.HasPrefix(repoID, repo[:last]) {
+				envs = append(envs, "GIT_REPO_TRUSTED=true")
+				break
+			}
+		} else if repo == repoID {
 			envs = append(envs, "GIT_REPO_TRUSTED=true")
 			break
 		}

@@ -120,9 +120,16 @@ A repo my have its own `.gitdeploy/deploy.sh` at its root, but by default these 
 You can set `--trust-repos` (or `TRUST_REPOS`) to allow deploy scripts to be run directly
 from a repository.
 
+- matches are case-insensitive (`foo` matches `Foo`)
+- a wildcard `*` may be used (at the end of a string) to define a prefix
+- the list may be space `' '` or comman `,` delimited
+
 ```bash
 # trust a few repos to run their own deploy scripts
-gitdeploy run --listen :3000 --trust-repos 'github.com/org/one,github.com/org/two'
+gitdeploy run --listen :3000 --trust-repos 'github.com/org/one github.com/org/two'
+
+# trust an organization
+gitdeploy run --listen :3000 --trust-repos 'github.com/org/*'
 
 # trust all repos
 gitdeploy run --listen :3000 --trust-repos '*'
