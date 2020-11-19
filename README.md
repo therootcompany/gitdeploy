@@ -2,6 +2,11 @@
 
 **gitdeploy** is an app for continuous deployment of static websites.
 
+1. Point a domain to a server running `gitdeploy`
+2. [Set git webhooks](#add-webhooks) (Github, Gitea, Bitbucket, etc)
+3. Create [build & deploy scripts](#setup-with-deploy-scripts) from the examples
+4. Profit (when you push, the build will kick off)
+
 ## Features
 
 **gitdeploy** is intended for use with static websites that are generated after
@@ -53,7 +58,7 @@ Usage of gitdeploy run:
 ## Install
 
 You can download `gitdeploy` from the Github Releases API and place it in your PATH,
-or install it with [Webi](https://webinstall.dev) ([webinstall.dev](https://webinstall.dev)):
+or install it with [Webi](https://webinstall.dev) ([webinstall.dev/gitdeploy](https://webinstall.dev/gitdeploy)):
 
 **Mac**, **Linux**:
 
@@ -66,6 +71,10 @@ curl -sS https://webinstall.dev/gitdeploy | bash
 ```bash
 curl -A MS https://webinstall.dev/gitdeploy | powershell
 ```
+
+**Manual Install**
+
+See <https://github.com/therootcompany/gitdeploy/releases>.
 
 ## Git SSH Deploy Keys and Tokens
 
