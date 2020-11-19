@@ -278,6 +278,21 @@ URL: https://YOUR_DOMAIN/api/webhooks/bitbucket?access_token=YOUR_SECRET
 Triggers: Repository push
 ```
 
+### Securing the Webook with HTTPS
+
+I recommend using [caddy](https://webinstall.dev/caddy) to HTTPS:
+
+```caddyfile
+gitdeploy.example.com {
+    log {
+        output stdout
+        format console
+    }
+    encode gzip zstd
+    reverse_proxy /* localhost:4483
+}
+```
+
 ## How to Generate a Base64 Secret
 
 **in your browser**:
