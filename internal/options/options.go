@@ -13,6 +13,7 @@ type ServerConfig struct {
 	Compress    bool
 	ServePath   string
 	ScriptsPath string
+	Promotions  []string
 }
 
 var ServerFlags *flag.FlagSet
