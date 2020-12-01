@@ -3,11 +3,11 @@ package github
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"strings"
 
+	"git.rootprojects.org/root/gitdeploy/internal/log"
 	"git.rootprojects.org/root/gitdeploy/internal/options"
 	"git.rootprojects.org/root/gitdeploy/internal/webhooks"
 

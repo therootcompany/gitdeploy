@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"strings"
 
+	"git.rootprojects.org/root/gitdeploy/internal/log"
 	"git.rootprojects.org/root/gitdeploy/internal/options"
 	"git.rootprojects.org/root/gitdeploy/internal/webhooks"
 
@@ -114,7 +114,7 @@ func InitWebhook(providername string, secretList *string, envname string) func()
 					branch = refName
 					ref = fmt.Sprintf("refs/heads/%s", refName)
 				default:
-					log.Println("unexpected bitbucket RefType", refType)
+					log.Printf("unexpected bitbucket RefType %s\n", refType)
 					ref = fmt.Sprintf("refs/UNKNOWN/%s", refName)
 				}
 

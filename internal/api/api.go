@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -13,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"git.rootprojects.org/root/gitdeploy/internal/log"
 	"git.rootprojects.org/root/gitdeploy/internal/options"
 	"git.rootprojects.org/root/gitdeploy/internal/webhooks"
 
@@ -79,7 +79,7 @@ func Route(r chi.Router, runOpts *options.ServerConfig) {
 				// r.Body is always .Close()ed by Go's http server
 				r.Body = http.MaxBytesReader(w, r.Body, options.DefaultMaxBodySize)
 				// TODO admin auth middleware
-				log.Println("TODO: handle authentication")
+				log.Printf("TODO: handle authentication")
 				next.ServeHTTP(w, r)
 			})
 		})
@@ -153,7 +153,7 @@ func Route(r chi.Router, runOpts *options.ServerConfig) {
 			decoder := json.NewDecoder(r.Body)
 			msg := &KillMsg{}
 			if err := decoder.Decode(msg); nil != err {
-				log.Println("kill job invalid json:", err)
+				log.Printf("kill job invalid json:\n%v", err)
 				http.Error(w, "invalid json body", http.StatusBadRequest)
 				return
 			}
@@ -178,12 +178,12 @@ func Route(r chi.Router, runOpts *options.ServerConfig) {
 			decoder := json.NewDecoder(r.Body)
 			msg := &webhooks.Ref{}
 			if err := decoder.Decode(msg); nil != err {
-				log.Println("promotion job invalid json:", err)
+				log.Printf("promotion job invalid json:\n%v", err)
 				http.Error(w, "invalid json body", http.StatusBadRequest)
 				return
 			}
 			if "" == msg.HTTPSURL || "" == msg.RefName {
-				log.Println("promotion job incomplete json", msg)
+				log.Printf("promotion job incomplete json %s", msg)
 				http.Error(w, "incomplete json body", http.StatusBadRequest)
 				return
 			}
@@ -196,7 +196,7 @@ func Route(r chi.Router, runOpts *options.ServerConfig) {
 				}
 			}
 			if n < 0 {
-				log.Println("promotion job invalid: cannot promote:", n)
+				log.Printf("promotion job invalid: cannot promote: %d", n)
 				http.Error(w, "invalid promotion", http.StatusBadRequest)
 				return
 			}
@@ -319,7 +319,7 @@ func remove(jobID string, nokill bool) {
 		if nil != job.Cmd.Process {
 			// but definitely was started
 			err := job.Cmd.Process.Kill()
-			log.Println("error killing job:", err)
+			log.Printf("error killing job:\n%v", err)
 		}
 	}
 }
