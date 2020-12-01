@@ -55,6 +55,19 @@ func init() {
 	log.Printf("TEMP_DIR=%s", tmpDir)
 }
 
+// ReposResponse is the successful response to /api/repos
+type ReposResponse struct {
+	Success bool   `json:"success"`
+	Repos   []Repo `json:"repos"`
+}
+
+// Repo is one of the elements of /api/repos
+type Repo struct {
+	ID         string   `json:"id"`
+	CloneURL   string   `json:"clone_url"`
+	Promotions []string `json:"_promotions"`
+}
+
 // Route will set up the API and such
 func Route(r chi.Router, runOpts *options.ServerConfig) {
 
@@ -74,6 +87,7 @@ func Route(r chi.Router, runOpts *options.ServerConfig) {
 	webhooks.RouteHandlers(r)
 
 	r.Route("/api/admin", func(r chi.Router) {
+
 		r.Use(func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// r.Body is always .Close()ed by Go's http server
@@ -126,6 +140,7 @@ func Route(r chi.Router, runOpts *options.ServerConfig) {
 			w.Header().Set("Content-Type", "application/json")
 			w.Write(append(b, '\n'))
 		})
+
 		r.Get("/jobs", func(w http.ResponseWriter, r *http.Request) {
 			// again, possible race condition, but not one that much matters
 			jjobs := []Job{}
@@ -145,6 +160,7 @@ func Route(r chi.Router, runOpts *options.ServerConfig) {
 			})
 			w.Write(append(b, '\n'))
 		})
+
 		r.Post("/jobs", func(w http.ResponseWriter, r *http.Request) {
 			defer func() {
 				_ = r.Body.Close()
@@ -220,9 +236,16 @@ func Route(r chi.Router, runOpts *options.ServerConfig) {
 
 func runHook(hook webhooks.Ref, runOpts *options.ServerConfig) {
 	fmt.Printf("%#v\n", hook)
+
 	jobID := base64.RawURLEncoding.EncodeToString([]byte(
 		fmt.Sprintf("%s#%s", hook.HTTPSURL, hook.RefName),
 	))
+	repoID := getRepoID(hook.HTTPSURL)
+	jobName := fmt.Sprintf("%s#%s", strings.ReplaceAll(repoID, "/", "-"), hook.RefName)
+
+	env := os.Environ()
+	envs := getEnvs(jobID, runOpts.RepoList, hook)
+	envs = append(envs, "GIT_DEPLOY_JOB_ID="+jobID)
 
 	args := []string{
 		runOpts.ScriptsPath + "/deploy.sh",
@@ -234,45 +257,6 @@ func runHook(hook webhooks.Ref, runOpts *options.ServerConfig) {
 		hook.HTTPSURL,
 	}
 	cmd := exec.Command("bash", args...)
-
-	// https://git.example.com/example/project.git
-	//      => git.example.com/example/project
-	repoID := strings.TrimPrefix(hook.HTTPSURL, "https://")
-	repoID = strings.TrimPrefix(repoID, "https://")
-	repoID = strings.TrimSuffix(repoID, ".git")
-	jobName := fmt.Sprintf("%s#%s", strings.ReplaceAll(repoID, "/", "-"), hook.RefName)
-
-	env := os.Environ()
-	envs := []string{
-		"GIT_DEPLOY_JOB_ID=" + jobID,
-		"GIT_REF_NAME=" + hook.RefName,
-		"GIT_REF_TYPE=" + hook.RefType,
-		"GIT_REPO_ID=" + repoID,
-		"GIT_REPO_OWNER=" + hook.Owner,
-		"GIT_REPO_NAME=" + hook.Repo,
-		"GIT_CLONE_URL=" + hook.HTTPSURL, // deprecated
-		"GIT_HTTPS_URL=" + hook.HTTPSURL,
-		"GIT_SSH_URL=" + hook.SSHURL,
-	}
-	for _, repo := range strings.Fields(runOpts.RepoList) {
-		last := len(repo) - 1
-		if len(repo) < 0 {
-			continue
-		}
-		repoID = strings.ToLower(repoID)
-		if '*' == repo[last] {
-			// Wildcard match a prefix, for example:
-			// github.com/whatever/*					MATCHES github.com/whatever/foo
-			// github.com/whatever/ProjectX-* MATCHES github.com/whatever/ProjectX-Foo
-			if strings.HasPrefix(repoID, repo[:last]) {
-				envs = append(envs, "GIT_REPO_TRUSTED=true")
-				break
-			}
-		} else if repo == repoID {
-			envs = append(envs, "GIT_REPO_TRUSTED=true")
-			break
-		}
-	}
 	cmd.Env = append(env, envs...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -346,15 +330,8 @@ func runPromote(hook webhooks.Ref, promoteTo string, runOpts *options.ServerConf
 	cmd := exec.Command("bash", args...)
 
 	env := os.Environ()
-	envs := []string{
-		"GIT_DEPLOY_JOB_ID=" + jobID1,
-		"GIT_DEPLOY_PROMOTE_TO=" + promoteTo,
-		"GIT_REF_NAME=" + hook.RefName,
-		"GIT_REF_TYPE=" + hook.RefType,
-		"GIT_REPO_OWNER=" + hook.Owner,
-		"GIT_REPO_NAME=" + hook.Repo,
-		"GIT_CLONE_URL=" + hook.HTTPSURL,
-	}
+	envs := getEnvs(jobID1, runOpts.RepoList, hook)
+	envs = append(envs, "GIT_DEPLOY_PROMOTE_TO="+promoteTo)
 	cmd.Env = append(env, envs...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -443,15 +420,52 @@ func restoreBacklog(jobName, jobID string) {
 	webhooks.Hook(ref)
 }
 
-// ReposResponse is the successful response to /api/repos
-type ReposResponse struct {
-	Success bool   `json:"success"`
-	Repos   []Repo `json:"repos"`
+// https://git.example.com/example/project.git
+//      => git.example.com/example/project
+func getRepoID(httpsURL string) string {
+	repoID := strings.TrimPrefix(httpsURL, "https://")
+	repoID = strings.TrimPrefix(repoID, "https://")
+	repoID = strings.TrimSuffix(repoID, ".git")
+	return repoID
 }
 
-// Repo is one of the elements of /api/repos
-type Repo struct {
-	ID         string   `json:"id"`
-	CloneURL   string   `json:"clone_url"`
-	Promotions []string `json:"_promotions"`
+func getEnvs(jobID string, repoList string, hook webhooks.Ref) []string {
+	repoID := getRepoID(hook.HTTPSURL)
+
+	envs := []string{
+		"GIT_DEPLOY_JOB_ID=" + jobID,
+		"GIT_REF_NAME=" + hook.RefName,
+		"GIT_REF_TYPE=" + hook.RefType,
+		"GIT_REPO_ID=" + repoID,
+		"GIT_REPO_OWNER=" + hook.Owner,
+		"GIT_REPO_NAME=" + hook.Repo,
+		"GIT_CLONE_URL=" + hook.HTTPSURL, // deprecated
+		"GIT_HTTPS_URL=" + hook.HTTPSURL,
+		"GIT_SSH_URL=" + hook.SSHURL,
+	}
+
+	// GIT_REPO_TRUSTED
+	// Set GIT_REPO_TRUSTED=TRUE if the repo matches exactly, or by pattern
+	repoID = strings.ToLower(repoID)
+	for _, repo := range strings.Fields(repoList) {
+		last := len(repo) - 1
+		if len(repo) < 0 {
+			continue
+		}
+		repo = strings.ToLower(repo)
+		if '*' == repo[last] {
+			// Wildcard match a prefix, for example:
+			// github.com/whatever/*					MATCHES github.com/whatever/foo
+			// github.com/whatever/ProjectX-* MATCHES github.com/whatever/ProjectX-Foo
+			if strings.HasPrefix(repoID, repo[:last]) {
+				envs = append(envs, "GIT_REPO_TRUSTED=true")
+				break
+			}
+		} else if repo == repoID {
+			envs = append(envs, "GIT_REPO_TRUSTED=true")
+			break
+		}
+	}
+
+	return envs
 }
