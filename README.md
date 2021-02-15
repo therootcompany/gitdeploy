@@ -170,9 +170,18 @@ GET  /api/admin/jobs
       "success": true,
       "jobs": [
         {
-          "job_id":     "xxxx",
-          "created_at": "2020-01-01T00:00:00Z",
-          "ref":        "0000000",
+            "job_id": "XXXXXXXXXXXX",
+            "created_at": "2020-01-01T12:30:45.999Z",
+            "ref": {
+                "https_url": "https://github.com/example-org/example-project.git",
+                "ssh_url": "git@github.com:example-org/example-project.git",
+                "rev": "xxxxxxx",
+                "ref": "refs/heads/demo",
+                "ref_type": "branch",
+                "ref_name": "master",
+                "repo_owner": "example-org",
+                "repo_name": "example-project"
+            }
         }
       ]
     }
