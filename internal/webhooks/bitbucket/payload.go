@@ -4,13 +4,16 @@ import "time"
 
 // Thank you Matt!
 // See https://mholt.github.io/json-to-go/
+// See `repo:push payload` on https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/
 
+// Webhook is a smaller version of
 type Webhook struct {
 	Push       Push       `json:"push"`
 	Actor      Actor      `json:"actor"`
 	Repository Repository `json:"repository"`
 }
 
+// Push is the bitbucket webhook
 type Push struct {
 	Changes []struct {
 		Forced bool `json:"forced"`
@@ -191,6 +194,7 @@ type Push struct {
 	} `json:"changes"`
 }
 
+// Actor represents the user / account taking action
 type Actor struct {
 	DisplayName string `json:"display_name"`
 	UUID        string `json:"uuid"`
@@ -199,6 +203,7 @@ type Actor struct {
 	AccountID   string `json:"account_id"`
 }
 
+// Repository represents repo info
 type Repository struct {
 	Name    string      `json:"name"`
 	Scm     string      `json:"scm"`

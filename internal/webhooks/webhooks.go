@@ -1,8 +1,10 @@
 package webhooks
 
 import (
+	"encoding/base64"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi"
 )
@@ -16,16 +18,78 @@ import (
 //     Repo     ex: example
 //     Org      ex: example
 type Ref struct {
-	HTTPSURL string `json:"https_url"`
-	SSHURL   string `json:"ssh_url"`
-	Rev      string `json:"rev"`
-	Ref      string `json:"ref"`      // refs/tags/v0.0.1, refs/heads/master
-	RefType  string `json:"ref_type"` // tag, branch
-	RefName  string `json:"ref_name"`
-	Branch   string `json:"branch"`
-	Tag      string `json:"tag"`
-	Owner    string `json:"repo_owner"`
-	Repo     string `json:"repo_name"`
+	RepoID    string    `json:"repo_id"`
+	Timestamp time.Time `json:"timestamp"`
+	HTTPSURL  string    `json:"https_url"`
+	SSHURL    string    `json:"ssh_url"`
+	Rev       string    `json:"rev"`
+	Ref       string    `json:"ref"`      // refs/tags/v0.0.1, refs/heads/master
+	RefType   string    `json:"ref_type"` // tag, branch
+	RefName   string    `json:"ref_name"`
+	Owner     string    `json:"repo_owner"`
+	Repo      string    `json:"repo_name"`
+	//Branch    string    `json:"branch"` // deprecated
+	//Tag       string    `json:"tag"`    // deprecated
+}
+
+// RefID is a newtype string
+type RefID string
+
+// URLSafeRefID is a newtype string
+type URLSafeRefID string
+
+// RevID is a newtype string
+type RevID string
+
+// URLSafeRevID is a newtype string
+type URLSafeRevID string
+
+// URLSafeGitID is a newtype string
+type URLSafeGitID string
+
+// New returns a normalized Ref (Git reference)
+func New(r Ref) *Ref {
+	if len(r.HTTPSURL) > 0 {
+		r.RepoID = getRepoID(r.HTTPSURL)
+	} else /*if len(r.SSHURL) > 0*/ {
+		r.RepoID = getRepoID(r.SSHURL)
+	}
+	r.Timestamp = getTimestamp(r.Timestamp)
+
+	return &r
+}
+
+// String prints object as git.example.com#branch@rev
+func (h *Ref) String() string {
+	return string(h.GetRefID()) + "@" + h.Rev[:7]
+}
+
+// GetRefID returns a unique reference like "github.com/org/project#branch"
+func (h *Ref) GetRefID() RefID {
+	return RefID(h.RepoID + "#" + h.RefName)
+}
+
+// GetURLSafeRefID returns the URL-safe Base64 encoding of the RefID
+func (h *Ref) GetURLSafeRefID() URLSafeRefID {
+	return URLSafeRefID(
+		base64.RawURLEncoding.EncodeToString(
+			[]byte(h.GetRefID()),
+		),
+	)
+}
+
+// GetRevID returns a unique reference like "github.com/org/project#abcd7890"
+func (h *Ref) GetRevID() RevID {
+	return RevID(h.RepoID + "#" + h.Rev)
+}
+
+// GetURLSafeRevID returns the URL-safe Base64 encoding of the RevID
+func (h *Ref) GetURLSafeRevID() URLSafeRevID {
+	return URLSafeRevID(
+		base64.RawURLEncoding.EncodeToString(
+			[]byte(h.GetRevID()),
+		),
+	)
 }
 
 // Providers is a map of the git webhook providers
@@ -92,4 +156,21 @@ func ParseSecrets(providername, secretList, envname string) [][]byte {
 	}
 
 	return secrets
+}
+
+// https://git.example.com/example/project.git
+//      => git.example.com/example/project
+func getRepoID(url string) string {
+	repoID := strings.TrimPrefix(url, "https://")
+	repoID = strings.TrimPrefix(repoID, "http://")
+	repoID = strings.TrimPrefix(repoID, "ssh://")
+	repoID = strings.TrimSuffix(repoID, ".git")
+	return repoID
+}
+
+func getTimestamp(t time.Time) time.Time {
+	if t.IsZero() {
+		t = time.Now().UTC()
+	}
+	return t
 }

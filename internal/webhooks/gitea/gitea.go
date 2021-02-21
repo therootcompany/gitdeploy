@@ -72,8 +72,8 @@ func InitWebhook(providername string, secretList *string, envname string) func()
 					return
 				}
 
-				var tag string
-				var branch string
+				//var tag string
+				//var branch string
 				ref := info.Ref // refs/heads/master
 				parts := strings.Split(ref, "/")
 				refType := parts[1] // refs/[heads]/master
@@ -82,25 +82,26 @@ func InitWebhook(providername string, secretList *string, envname string) func()
 				switch refType {
 				case "tags":
 					refType = "tag"
-					tag = refName
+					//tag = refName
 				case "heads":
 					refType = "branch"
-					branch = refName
+					//branch = refName
 				default:
 					refType = "unknown"
 				}
 
 				webhooks.Hook(webhooks.Ref{
+					// missing Timestamp
 					HTTPSURL: info.Repository.CloneURL,
 					SSHURL:   info.Repository.SSHURL,
 					Rev:      info.After,
 					Ref:      ref,
 					RefType:  refType,
 					RefName:  refName,
-					Branch:   branch,
-					Tag:      tag,
 					Repo:     info.Repository.Name,
 					Owner:    info.Repository.Owner.Login,
+					//Branch:   branch,
+					//Tag:      tag,
 				})
 			})
 		})

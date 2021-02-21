@@ -6,8 +6,8 @@ package gitea
 // repository.full_name
 // repository.clone_url
 
-// See https://docs.gitea.io/en-us/webhooks/
-// and https://mholt.github.io/json-to-go/
+// Webhook mirrors https://docs.gitea.io/en-us/webhooks/.
+// Created in part with https://mholt.github.io/json-to-go/.
 type Webhook struct {
 	Secret     string `json:"secret"`
 	Ref        string `json:"ref"`
