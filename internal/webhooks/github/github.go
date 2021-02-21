@@ -26,6 +26,7 @@ func init() {
 	webhooks.AddProvider("github", InitWebhook("github", &githubSecrets, "GITHUB_SECRET"))
 }
 
+// InitWebhook initializes the webhook when registered
 func InitWebhook(providername string, secretList *string, envname string) func() {
 	return func() {
 		secrets := webhooks.ParseSecrets(providername, *secretList, envname)
@@ -84,17 +85,19 @@ func InitWebhook(providername string, secretList *string, envname string) func()
 						refType = "branch"
 						branch = refName
 					}
+
 					webhooks.Hook(webhooks.Ref{
-						HTTPSURL: e.GetRepo().GetCloneURL(),
-						SSHURL:   e.GetRepo().GetSSHURL(),
-						Rev:      e.GetAfter(), // *e.After
-						Ref:      ref,
-						RefType:  refType,
-						RefName:  refName,
-						Branch:   branch,
-						Tag:      tag,
-						Repo:     e.GetRepo().GetName(), // *e.Repo.Name
-						Owner:    e.GetRepo().GetOwner().GetLogin(),
+						Timestamp: e.GetRepo().GetPushedAt().Time,
+						HTTPSURL:  e.GetRepo().GetCloneURL(),
+						SSHURL:    e.GetRepo().GetSSHURL(),
+						Rev:       e.GetAfter(), // *e.After
+						Ref:       ref,
+						RefType:   refType,
+						RefName:   refName,
+						Branch:    branch,
+						Tag:       tag,
+						Repo:      e.GetRepo().GetName(), // *e.Repo.Name
+						Owner:     e.GetRepo().GetOwner().GetLogin(),
 					})
 				/*
 					case *github.PullRequestEvent:

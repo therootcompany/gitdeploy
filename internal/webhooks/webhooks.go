@@ -3,6 +3,7 @@ package webhooks
 import (
 	"os"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi"
 )
@@ -16,16 +17,35 @@ import (
 //     Repo     ex: example
 //     Org      ex: example
 type Ref struct {
-	HTTPSURL string `json:"https_url"`
-	SSHURL   string `json:"ssh_url"`
-	Rev      string `json:"rev"`
-	Ref      string `json:"ref"`      // refs/tags/v0.0.1, refs/heads/master
-	RefType  string `json:"ref_type"` // tag, branch
-	RefName  string `json:"ref_name"`
-	Branch   string `json:"branch"`
-	Tag      string `json:"tag"`
-	Owner    string `json:"repo_owner"`
-	Repo     string `json:"repo_name"`
+	RepoID    string    `json:"repo_id"`
+	Timestamp time.Time `json:"timestamp"`
+	HTTPSURL  string    `json:"https_url"`
+	SSHURL    string    `json:"ssh_url"`
+	Rev       string    `json:"rev"`
+	Ref       string    `json:"ref"`      // refs/tags/v0.0.1, refs/heads/master
+	RefType   string    `json:"ref_type"` // tag, branch
+	RefName   string    `json:"ref_name"`
+	Branch    string    `json:"branch"` // deprecated
+	Tag       string    `json:"tag"`    // deprecated
+	Owner     string    `json:"repo_owner"`
+	Repo      string    `json:"repo_name"`
+}
+
+// New returns a normalized Ref (Git reference)
+func New(r Ref) *Ref {
+	if len(r.HTTPSURL) > 0 {
+		r.RepoID = getRepoID(r.HTTPSURL)
+	} else /*if len(r.SSHURL) > 0*/ {
+		r.RepoID = getRepoID(r.SSHURL)
+	}
+	r.Timestamp = getTimestamp(r.Timestamp)
+
+	return &r
+}
+
+// GetRefID returns a unique reference like "github.com/org/project#branch"
+func (h *Ref) GetRefID() string {
+	return h.RepoID + "#" + h.RefName
 }
 
 // Providers is a map of the git webhook providers
@@ -92,4 +112,21 @@ func ParseSecrets(providername, secretList, envname string) [][]byte {
 	}
 
 	return secrets
+}
+
+// https://git.example.com/example/project.git
+//      => git.example.com/example/project
+func getRepoID(url string) string {
+	repoID := strings.TrimPrefix(url, "https://")
+	repoID = strings.TrimPrefix(repoID, "http://")
+	repoID = strings.TrimPrefix(repoID, "ssh://")
+	repoID = strings.TrimSuffix(repoID, ".git")
+	return repoID
+}
+
+func getTimestamp(t time.Time) time.Time {
+	if t.IsZero() {
+		t = time.Now().UTC()
+	}
+	return t
 }

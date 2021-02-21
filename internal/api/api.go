@@ -1,13 +1,11 @@
 package api
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -19,40 +17,14 @@ import (
 	"github.com/go-chi/chi"
 )
 
-type job struct {
-	ID        string // {HTTPSURL}#{BRANCH}
-	Cmd       *exec.Cmd
-	GitRef    webhooks.Ref
-	CreatedAt time.Time
-}
-
-var jobs = make(map[string]*job)
-var killers = make(chan string)
-var tmpDir string
-
-// Job is the JSON we send back through the API about jobs
-type Job struct {
-	JobID     string       `json:"job_id"`
-	CreatedAt time.Time    `json:"created_at"`
-	GitRef    webhooks.Ref `json:"ref"`
-	Promote   bool         `json:"promote,omitempty"`
-}
-
-// KillMsg describes which job to kill
-type KillMsg struct {
-	JobID string `json:"job_id"`
-	Kill  bool   `json:"kill"`
-}
-
-func init() {
-	var err error
-	tmpDir, err = ioutil.TempDir("", "gitdeploy-*")
-	if nil != err {
-		fmt.Fprintf(os.Stderr, "could not create temporary directory")
-		os.Exit(1)
-		return
-	}
-	log.Printf("TEMP_DIR=%s", tmpDir)
+// HookResponse is a GitRef but with a little extra as HTTP response
+type HookResponse struct {
+	RepoID    string    `json:"repo_id"`
+	CreatedAt time.Time `json:"created_at"`
+	EndedAt   time.Time `json:"ended_at"`
+	ExitCode  *int      `json:"exit_code,omitempty"`
+	Log       string    `json:"log"`
+	LogURL    string    `json:"log_url"`
 }
 
 // ReposResponse is the successful response to /api/repos
@@ -70,16 +42,40 @@ type Repo struct {
 
 // Route will set up the API and such
 func Route(r chi.Router, runOpts *options.ServerConfig) {
+	LogDir = os.Getenv("LOG_DIR")
 
 	go func() {
 		// TODO read from backlog
 		for {
 			//hook := webhooks.Accept()
 			select {
+			case promotion := <-Promotions:
+				gitref := webhooks.New(*promotion.Ref)
+				runPromote(*gitref, promotion.PromoteTo, runOpts)
 			case hook := <-webhooks.Hooks:
-				runHook(hook, runOpts)
+				normalizeHook(&hook)
+				debounceHook(hook, runOpts)
 			case jobID := <-killers:
-				remove(jobID, false)
+				// should !nokill (so... should kill job on the spot?)
+				removeJob(jobID /*, false*/)
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			time.Sleep(time.Minute)
+
+			// TODO mutex here again (or switch to sync.Map)
+			staleJobIDs := []string{}
+			for jobID, job := range recentJobs {
+				if time.Now().Sub(job.CreatedAt) > time.Hour {
+					staleJobIDs = append(staleJobIDs, jobID)
+				}
+			}
+			// and here
+			for i := range staleJobIDs {
+				delete(recentJobs, staleJobIDs[i])
 			}
 		}
 	}()
@@ -141,22 +137,96 @@ func Route(r chi.Router, runOpts *options.ServerConfig) {
 			w.Write(append(b, '\n'))
 		})
 
+		r.Get("/logs", func(w http.ResponseWriter, r *http.Request) {
+			// TODO add `since`
+			logs := []HookResponse{}
+
+			// Walk LOG_DIR
+			// group by LOG_DIR/**/*.log
+			// TODO delete old logs 15d+?
+			hooks, _ := WalkLogs(os.Getenv("LOG_DIR"))
+			for _, hook := range hooks {
+				//fmt.Printf("%#v\n\n", hook)
+				logName := hook.Timestamp.Format(TimeFile) + "." + hook.RefName + "." + hook.Rev
+				logURL := "/logs/" + hook.RepoID + "/" + logName
+				logStat, _ := os.Stat(filepath.Join("LOG_DIR", hook.RepoID, logName+".log"))
+				exitCode := 255
+				logs = append(logs, HookResponse{
+					RepoID:    hook.RepoID,
+					CreatedAt: hook.Timestamp,
+					EndedAt:   logStat.ModTime(),
+					ExitCode:  &exitCode,
+					Log:       logName,
+					LogURL:    logURL,
+				})
+			}
+
+			// join with active jobs
+			for _, job := range jobs {
+				hook := job.GitRef
+				//fmt.Printf("%#v\n\n", hook)
+				logName := hook.Timestamp.Format(TimeFile) + "." + hook.RefName + "." + hook.Rev
+				logURL := "/logs/" + hook.RepoID + "/" + logName
+				logs = append(logs, HookResponse{
+					RepoID:    hook.RepoID,
+					CreatedAt: hook.Timestamp,
+					//EndedAt: ,
+					ExitCode: job.ExitCode,
+					Log:      logName,
+					LogURL:   logURL,
+				})
+			}
+
+			b, _ := json.Marshal(struct {
+				Success bool `json:"success"`
+				Logs    []HookResponse
+			}{
+				Success: true,
+				Logs:    logs,
+			})
+			w.Write(append(b, '\n'))
+		})
+
+		r.Get("/logs/*", func(w http.ResponseWriter, r *http.Request) {
+			// TODO add ?since=
+			// TODO JSON logs
+			logPath := chi.URLParam(r, "*")
+			f, err := os.Open(filepath.Join(os.Getenv("LOG_DIR"), logPath))
+			if nil != err {
+				w.WriteHeader(404)
+				w.Write([]byte(
+					`{ "success": false, "error": "job log does not exist" }` + "\n",
+				))
+				return
+			}
+			io.Copy(w, f)
+		})
+
 		r.Get("/jobs", func(w http.ResponseWriter, r *http.Request) {
 			// again, possible race condition, but not one that much matters
-			jjobs := []Job{}
+			jobsCopy := []Job{}
 			for jobID, job := range jobs {
-				jjobs = append(jjobs, Job{
+				jobsCopy = append(jobsCopy, Job{
 					JobID:     jobID,
 					GitRef:    job.GitRef,
 					CreatedAt: job.CreatedAt,
 				})
 			}
+			// and here too
+			for jobID, job := range recentJobs {
+				jobsCopy = append(jobsCopy, Job{
+					JobID:     jobID,
+					GitRef:    job.GitRef,
+					CreatedAt: job.CreatedAt,
+				})
+			}
+
 			b, _ := json.Marshal(struct {
 				Success bool  `json:"success"`
 				Jobs    []Job `json:"jobs"`
 			}{
 				Success: true,
-				Jobs:    jjobs,
+				Jobs:    jobsCopy,
 			})
 			w.Write(append(b, '\n'))
 		})
@@ -190,6 +260,13 @@ func Route(r chi.Router, runOpts *options.ServerConfig) {
 			))
 		})
 
+		r.Post("/jobs/{jobID}", func(w http.ResponseWriter, r *http.Request) {
+			// Attach additional logs / reports to running job
+			w.Write([]byte(
+				`{ "success": true }` + "\n",
+			))
+		})
+
 		r.Post("/promote", func(w http.ResponseWriter, r *http.Request) {
 			decoder := json.NewDecoder(r.Body)
 			msg := &webhooks.Ref{}
@@ -218,7 +295,10 @@ func Route(r chi.Router, runOpts *options.ServerConfig) {
 			}
 
 			promoteTo := runOpts.Promotions[n]
-			runPromote(*msg, promoteTo, runOpts)
+			Promotions <- Promotion{
+				PromoteTo: promoteTo,
+				Ref:       msg,
+			}
 
 			b, _ := json.Marshal(struct {
 				Success   bool   `json:"success"`
@@ -232,240 +312,4 @@ func Route(r chi.Router, runOpts *options.ServerConfig) {
 		})
 	})
 
-}
-
-func runHook(hook webhooks.Ref, runOpts *options.ServerConfig) {
-	fmt.Printf("%#v\n", hook)
-
-	jobID := base64.RawURLEncoding.EncodeToString([]byte(
-		fmt.Sprintf("%s#%s", hook.HTTPSURL, hook.RefName),
-	))
-	repoID := getRepoID(hook.HTTPSURL)
-	jobName := fmt.Sprintf("%s#%s", strings.ReplaceAll(repoID, "/", "-"), hook.RefName)
-
-	env := os.Environ()
-	envs := getEnvs(jobID, runOpts.RepoList, hook)
-	envs = append(envs, "GIT_DEPLOY_JOB_ID="+jobID)
-
-	args := []string{
-		runOpts.ScriptsPath + "/deploy.sh",
-		jobID,
-		hook.RefName,
-		hook.RefType,
-		hook.Owner,
-		hook.Repo,
-		hook.HTTPSURL,
-	}
-	cmd := exec.Command("bash", args...)
-	cmd.Env = append(env, envs...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if _, exists := jobs[jobID]; exists {
-		saveBacklog(hook, jobName, jobID)
-		log.Printf("[runHook] gitdeploy job already started for %s#%s\n", hook.HTTPSURL, hook.RefName)
-		return
-	}
-
-	if err := cmd.Start(); nil != err {
-		log.Printf("gitdeploy exec error: %s\n", err)
-		return
-	}
-
-	jobs[jobID] = &job{
-		ID:        jobID,
-		Cmd:       cmd,
-		GitRef:    hook,
-		CreatedAt: time.Now(),
-	}
-
-	go func() {
-		log.Printf("gitdeploy job for %s#%s started\n", hook.HTTPSURL, hook.RefName)
-		if err := cmd.Wait(); nil != err {
-			log.Printf("gitdeploy job for %s#%s exited with error: %v", hook.HTTPSURL, hook.RefName, err)
-		} else {
-			log.Printf("gitdeploy job for %s#%s finished\n", hook.HTTPSURL, hook.RefName)
-		}
-		remove(jobID, true)
-		restoreBacklog(jobName, jobID)
-	}()
-}
-
-func remove(jobID string, nokill bool) {
-	job, exists := jobs[jobID]
-	if !exists {
-		return
-	}
-	delete(jobs, jobID)
-
-	if nil != job.Cmd.ProcessState {
-		// is not yet finished
-		if nil != job.Cmd.Process {
-			// but definitely was started
-			err := job.Cmd.Process.Kill()
-			log.Printf("error killing job:\n%v", err)
-		}
-	}
-}
-
-func runPromote(hook webhooks.Ref, promoteTo string, runOpts *options.ServerConfig) {
-	// TODO create an origin-branch tag with a timestamp?
-	jobID1 := base64.RawURLEncoding.EncodeToString([]byte(
-		fmt.Sprintf("%s#%s", hook.HTTPSURL, hook.RefName),
-	))
-	jobID2 := base64.RawURLEncoding.EncodeToString([]byte(
-		fmt.Sprintf("%s#%s", hook.HTTPSURL, promoteTo),
-	))
-
-	args := []string{
-		runOpts.ScriptsPath + "/promote.sh",
-		jobID1,
-		promoteTo,
-		hook.RefName,
-		hook.RefType,
-		hook.Owner,
-		hook.Repo,
-		hook.HTTPSURL,
-	}
-	cmd := exec.Command("bash", args...)
-
-	env := os.Environ()
-	envs := getEnvs(jobID1, runOpts.RepoList, hook)
-	envs = append(envs, "GIT_DEPLOY_PROMOTE_TO="+promoteTo)
-	cmd.Env = append(env, envs...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if _, exists := jobs[jobID1]; exists {
-		// TODO put promote in backlog
-		log.Printf("[promote] gitdeploy job already started for %s#%s\n", hook.HTTPSURL, hook.RefName)
-		return
-	}
-	if _, exists := jobs[jobID2]; exists {
-		// TODO put promote in backlog
-		log.Printf("[promote] gitdeploy job already started for %s#%s\n", hook.HTTPSURL, promoteTo)
-		return
-	}
-
-	if err := cmd.Start(); nil != err {
-		log.Printf("gitdeploy exec error: %s\n", err)
-		return
-	}
-
-	jobs[jobID1] = &job{
-		ID:        jobID2,
-		Cmd:       cmd,
-		GitRef:    hook,
-		CreatedAt: time.Now(),
-	}
-	jobs[jobID2] = &job{
-		ID:        jobID2,
-		Cmd:       cmd,
-		GitRef:    hook,
-		CreatedAt: time.Now(),
-	}
-
-	go func() {
-		log.Printf("gitdeploy promote for %s#%s started\n", hook.HTTPSURL, hook.RefName)
-		_ = cmd.Wait()
-		killers <- jobID1
-		killers <- jobID2
-		log.Printf("gitdeploy promote for %s#%s finished\n", hook.HTTPSURL, hook.RefName)
-		// TODO check for backlog
-	}()
-}
-
-func saveBacklog(hook webhooks.Ref, jobName, jobID string) {
-	b, _ := json.MarshalIndent(hook, "", "  ")
-	f, err := ioutil.TempFile(tmpDir, "tmp-*")
-	if nil != err {
-		log.Printf("[warn] could not create backlog file for %s:\n%v", jobID, err)
-		return
-	}
-	if _, err := f.Write(b); nil != err {
-		log.Printf("[warn] could not write backlog file for %s:\n%v", jobID, err)
-		return
-	}
-
-	jobFile := filepath.Join(tmpDir, jobName)
-	_ = os.Remove(jobFile)
-	if err := os.Rename(f.Name(), jobFile); nil != err {
-		log.Printf("[warn] could not rename file %s => %s:\n%v", f.Name(), jobFile, err)
-		return
-	}
-	log.Printf("[BACKLOG] new backlog job for %s", jobName)
-}
-
-func restoreBacklog(jobName, jobID string) {
-	jobFile := filepath.Join(tmpDir, jobName)
-	_ = os.Remove(jobFile + ".cur")
-	_ = os.Rename(jobFile, jobFile+".cur")
-
-	b, err := ioutil.ReadFile(jobFile + ".cur")
-	if nil != err {
-		if !os.IsNotExist(err) {
-			log.Printf("[warn] could not create backlog file for %s:\n%v", jobID, err)
-		}
-		// doesn't exist => no backlog
-		log.Printf("[NO BACKLOG] no backlog items for %s", jobName)
-		return
-	}
-
-	ref := webhooks.Ref{}
-	if err := json.Unmarshal(b, &ref); nil != err {
-		log.Printf("[warn] could not parse backlog file for %s:\n%v", jobID, err)
-		return
-	}
-	log.Printf("[BACKLOG] pop backlog for %s", jobName)
-	webhooks.Hook(ref)
-}
-
-// https://git.example.com/example/project.git
-//      => git.example.com/example/project
-func getRepoID(httpsURL string) string {
-	repoID := strings.TrimPrefix(httpsURL, "https://")
-	repoID = strings.TrimPrefix(repoID, "https://")
-	repoID = strings.TrimSuffix(repoID, ".git")
-	return repoID
-}
-
-func getEnvs(jobID string, repoList string, hook webhooks.Ref) []string {
-	repoID := getRepoID(hook.HTTPSURL)
-
-	envs := []string{
-		"GIT_DEPLOY_JOB_ID=" + jobID,
-		"GIT_REF_NAME=" + hook.RefName,
-		"GIT_REF_TYPE=" + hook.RefType,
-		"GIT_REPO_ID=" + repoID,
-		"GIT_REPO_OWNER=" + hook.Owner,
-		"GIT_REPO_NAME=" + hook.Repo,
-		"GIT_CLONE_URL=" + hook.HTTPSURL, // deprecated
-		"GIT_HTTPS_URL=" + hook.HTTPSURL,
-		"GIT_SSH_URL=" + hook.SSHURL,
-	}
-
-	// GIT_REPO_TRUSTED
-	// Set GIT_REPO_TRUSTED=TRUE if the repo matches exactly, or by pattern
-	repoID = strings.ToLower(repoID)
-	for _, repo := range strings.Fields(repoList) {
-		last := len(repo) - 1
-		if len(repo) < 0 {
-			continue
-		}
-		repo = strings.ToLower(repo)
-		if '*' == repo[last] {
-			// Wildcard match a prefix, for example:
-			// github.com/whatever/*					MATCHES github.com/whatever/foo
-			// github.com/whatever/ProjectX-* MATCHES github.com/whatever/ProjectX-Foo
-			if strings.HasPrefix(repoID, repo[:last]) {
-				envs = append(envs, "GIT_REPO_TRUSTED=true")
-				break
-			}
-		} else if repo == repoID {
-			envs = append(envs, "GIT_REPO_TRUSTED=true")
-			break
-		}
-	}
-
-	return envs
 }
