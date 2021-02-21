@@ -7,6 +7,9 @@
 # List promotions in descending order
 PROMOTIONS="production staging master"
 
+# Log dir
+LOG_DIR=./logs
+
 # Whether to trust X-Forward-* headers
 TRUST_PROXY=false
 

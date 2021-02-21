@@ -14,6 +14,8 @@ type ServerConfig struct {
 	ServePath   string
 	ScriptsPath string
 	Promotions  []string
+	// TODO LogDir
+	// TODO BacklogDir
 }
 
 var ServerFlags *flag.FlagSet
