@@ -25,33 +25,33 @@ var jobsTimersMux sync.Mutex
 var debounceTimers = make(map[string]*time.Timer)
 
 func debounce(hook *webhooks.Ref, runOpts *options.ServerConfig) {
-	// save to backlog
-	saveBacklog(hook, runOpts)
-
 	// lock access to 'debounceTimers' and 'jobs'
-	fmt.Println("DEBUG [0] wait for jobs and timers")
+	//fmt.Println("DEBUG [0] wait for jobs and timers")
 	jobsTimersMux.Lock()
 	defer func() {
-		fmt.Println("DEBUG [0] release jobs and timers")
+		//fmt.Println("DEBUG [0] release jobs and timers")
 		jobsTimersMux.Unlock()
 	}()
-	if _, exists := Jobs[getJobID(hook)]; exists {
-		log.Printf("[runHook] gitdeploy job already started for %s#%s\n", hook.HTTPSURL, hook.RefName)
+	if _, exists := Jobs[URLSafeRefID(hook.GetURLSafeRefID())]; exists {
+		log.Printf("Job in progress, not debouncing %s", hook)
 		return
 	}
+
 	refID := hook.GetRefID()
 	timer, ok := debounceTimers[refID]
 	if ok {
+		log.Printf("Replacing previous debounce timer for %s", hook)
 		timer.Stop()
 	}
 	// this will not cause a mutual lock because it is async
-	timer = time.AfterFunc(runOpts.DebounceDelay, func() {
-		fmt.Println("DEBUG [1] wait for jobs and timers")
+	debounceTimers[refID] = time.AfterFunc(runOpts.DebounceDelay, func() {
+		//fmt.Println("DEBUG [1] wait for jobs and timers")
 		jobsTimersMux.Lock()
-		defer jobsTimersMux.Unlock()
-		restoreBacklog(hook, runOpts)
 		delete(debounceTimers, refID)
-		fmt.Println("DEBUG [1] release jobs and timers")
+		jobsTimersMux.Unlock()
+
+		debounced <- hook
+		//fmt.Println("DEBUG [1] release jobs and timers")
 	})
 }
 
@@ -84,9 +84,10 @@ func saveBacklog(hook *webhooks.Ref, runOpts *options.ServerConfig) {
 		return
 	}
 
+	replace := false
 	jobFile := filepath.Join(repoDir, repoFile)
 	if _, err := os.Stat(jobFile); nil == err {
-		log.Printf("[backlog] remove stale job for %s", hook.GetRefID())
+		replace = true
 		_ = os.Remove(jobFile)
 	}
 	if err := os.Rename(f.Name(), jobFile); nil != err {
@@ -94,13 +95,20 @@ func saveBacklog(hook *webhooks.Ref, runOpts *options.ServerConfig) {
 		return
 	}
 
-	log.Printf("[backlog] add fresh job for %s", hook.GetRefID())
+	if replace {
+		log.Printf("[backlog] replace backlog for %s", hook.GetRefID())
+	} else {
+		log.Printf("[backlog] create backlog for %s", hook.GetRefID())
+	}
 }
 
-func restoreBacklog(curHook *webhooks.Ref, runOpts *options.ServerConfig) {
-	jobID := getJobID(curHook)
+func run(curHook *webhooks.Ref, runOpts *options.ServerConfig) {
+	jobsTimersMux.Lock()
+	defer jobsTimersMux.Unlock()
+
+	jobID := URLSafeRefID(curHook.GetURLSafeRefID())
 	if _, exists := Jobs[jobID]; exists {
-		log.Printf("[runHook] gitdeploy debounced job for %s\n", curHook.GetRefID())
+		log.Printf("Job already in progress: %s", curHook.GetRefID())
 		return
 	}
 
@@ -113,7 +121,7 @@ func restoreBacklog(curHook *webhooks.Ref, runOpts *options.ServerConfig) {
 	b, err := ioutil.ReadFile(jobFile + ".cur")
 	if nil != err {
 		if !os.IsNotExist(err) {
-			log.Printf("[warn] could not create backlog file %s:\n%v", repoFile, err)
+			log.Printf("[warn] could not read backlog file %s:\n%v", repoFile, err)
 		}
 		// doesn't exist => no backlog
 		log.Printf("[NO BACKLOG] no backlog for %s", repoFile)
@@ -127,10 +135,9 @@ func restoreBacklog(curHook *webhooks.Ref, runOpts *options.ServerConfig) {
 	}
 	hook = webhooks.New(*hook)
 
-	log.Printf("[BACKLOG] pop backlog for %s", repoFile)
 	env := os.Environ()
-	envs := getEnvs(runOpts.Addr, jobID, runOpts.RepoList, hook)
-	envs = append(envs, "GIT_DEPLOY_JOB_ID="+jobID)
+	envs := getEnvs(runOpts.Addr, string(jobID), runOpts.RepoList, hook)
+	envs = append(envs, "GIT_DEPLOY_JOB_ID="+string(jobID))
 
 	scriptPath, _ := filepath.Abs(runOpts.ScriptsPath + "/deploy.sh")
 	args := []string{
@@ -138,7 +145,7 @@ func restoreBacklog(curHook *webhooks.Ref, runOpts *options.ServerConfig) {
 		"--",
 		//strings.Join([]string{
 		scriptPath,
-		jobID,
+		string(jobID),
 		hook.RefName,
 		hook.RefType,
 		hook.Owner,
@@ -152,12 +159,13 @@ func restoreBacklog(curHook *webhooks.Ref, runOpts *options.ServerConfig) {
 	cmd := exec.Command("bash", args...)
 	cmd.Env = append(env, envs...)
 
-	j := &HookJob{
-		ID:        jobID,
+	now := time.Now()
+	j := &Job{
+		StartedAt: now,
 		Cmd:       cmd,
 		GitRef:    hook,
-		CreatedAt: hook.Timestamp,
 		Logs:      []Log{},
+		Promote:   false,
 	}
 	// TODO NewJob()
 	// Sets cmd.Stdout and cmd.Stderr
@@ -171,7 +179,7 @@ func restoreBacklog(curHook *webhooks.Ref, runOpts *options.ServerConfig) {
 	Jobs[jobID] = j
 
 	go func() {
-		log.Printf("gitdeploy job for %s#%s started\n", hook.HTTPSURL, hook.RefName)
+		log.Printf("Started job for %s", hook)
 		if err := cmd.Wait(); nil != err {
 			log.Printf("gitdeploy job for %s#%s exited with error: %v", hook.HTTPSURL, hook.RefName, err)
 		} else {
@@ -180,17 +188,12 @@ func restoreBacklog(curHook *webhooks.Ref, runOpts *options.ServerConfig) {
 		if nil != f {
 			_ = f.Close()
 		}
-		// nokill=true meaning let job finish? old cruft?
-		fmt.Println("DEBUG load killers")
-		//jobsTimersMux.Lock()
-		//removeJob(jobID /*, true*/)
-		//jobsTimersMux.Unlock()
+
+		// waits for job to be declared completely dead
 		deathRow <- jobID
-		fmt.Println("DEBUG load unkillers")
-		//restoreBacklog(hook, runOpts)
-		// re-debounce rather than running right away
-		fmt.Println("DEBUG load Hook")
-		webhooks.Hook(*hook)
-		fmt.Println("DEBUG unload Hook")
+
+		// debounces without saving in the backlog
+		// TODO move this into deathRow?
+		debacklog <- hook
 	}()
 }

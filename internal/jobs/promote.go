@@ -1,8 +1,6 @@
 package jobs
 
 import (
-	"encoding/base64"
-	"fmt"
 	"os"
 	"os/exec"
 	"time"
@@ -16,23 +14,21 @@ import (
 func Promote(msg webhooks.Ref, promoteTo string) {
 	Promotions <- Promotion{
 		PromoteTo: promoteTo,
-		Ref:       &msg,
+		GitRef:    &msg,
 	}
 }
 
 // promote will run the promote script
 func promote(hook *webhooks.Ref, promoteTo string, runOpts *options.ServerConfig) {
 	// TODO create an origin-branch tag with a timestamp?
-	jobID1 := base64.RawURLEncoding.EncodeToString([]byte(
-		fmt.Sprintf("%s#%s", hook.HTTPSURL, hook.RefName),
-	))
-	jobID2 := base64.RawURLEncoding.EncodeToString([]byte(
-		fmt.Sprintf("%s#%s", hook.HTTPSURL, promoteTo),
-	))
+	jobID1 := URLSafeRefID(hook.GetURLSafeRefID())
+	hookTo := *hook
+	hookTo.RefName = promoteTo
+	jobID2 := URLSafeRefID(hookTo.GetURLSafeRefID())
 
 	args := []string{
 		runOpts.ScriptsPath + "/promote.sh",
-		jobID1,
+		string(jobID1),
 		promoteTo,
 		hook.RefName,
 		hook.RefType,
@@ -43,7 +39,7 @@ func promote(hook *webhooks.Ref, promoteTo string, runOpts *options.ServerConfig
 	cmd := exec.Command("bash", args...)
 
 	env := os.Environ()
-	envs := getEnvs(runOpts.Addr, jobID1, runOpts.RepoList, hook)
+	envs := getEnvs(runOpts.Addr, string(jobID1), runOpts.RepoList, hook)
 	envs = append(envs, "GIT_DEPLOY_PROMOTE_TO="+promoteTo)
 	cmd.Env = append(env, envs...)
 	cmd.Stdout = os.Stdout
@@ -65,17 +61,18 @@ func promote(hook *webhooks.Ref, promoteTo string, runOpts *options.ServerConfig
 		return
 	}
 
-	Jobs[jobID1] = &HookJob{
-		ID:        jobID2,
+	now := time.Now()
+	Jobs[jobID1] = &Job{
+		StartedAt: now,
 		Cmd:       cmd,
 		GitRef:    hook,
-		CreatedAt: time.Now(),
+		Promote:   true,
 	}
-	Jobs[jobID2] = &HookJob{
-		ID:        jobID2,
+	Jobs[jobID2] = &Job{
+		StartedAt: now,
 		Cmd:       cmd,
 		GitRef:    hook,
-		CreatedAt: time.Now(),
+		Promote:   true,
 	}
 
 	go func() {

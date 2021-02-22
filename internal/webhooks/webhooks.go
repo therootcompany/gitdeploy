@@ -1,6 +1,8 @@
 package webhooks
 
 import (
+	"encoding/base64"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -43,9 +45,26 @@ func New(r Ref) *Ref {
 	return &r
 }
 
+// String prints object as git.example.com#branch@rev
+func (h *Ref) String() string {
+	return h.RepoID + "@" + h.Rev[:7]
+}
+
 // GetRefID returns a unique reference like "github.com/org/project#branch"
 func (h *Ref) GetRefID() string {
 	return h.RepoID + "#" + h.RefName
+}
+
+// GetURLSafeRefID returns the URL-safe Base64 encoding of the RefID
+func (h *Ref) GetURLSafeRefID() string {
+	return base64.RawURLEncoding.EncodeToString([]byte(
+		fmt.Sprintf("%s#%s", h.RepoID, h.RefName),
+	))
+}
+
+// GetRevID returns a unique reference like "github.com/org/project#abcd7890"
+func (h *Ref) GetRevID() string {
+	return h.RepoID + "#" + h.Rev
 }
 
 // Providers is a map of the git webhook providers

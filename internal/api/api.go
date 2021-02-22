@@ -44,7 +44,7 @@ type Repo struct {
 // Route will set up the API and such
 func Route(r chi.Router, runOpts *options.ServerConfig) {
 
-	jobs.Init(runOpts)
+	jobs.Start(runOpts)
 
 	webhooks.RouteHandlers(r)
 
@@ -172,8 +172,8 @@ func Route(r chi.Router, runOpts *options.ServerConfig) {
 			all := jobs.All()
 
 			b, _ := json.Marshal(struct {
-				Success bool       `json:"success"`
-				Jobs    []jobs.Job `json:"jobs"`
+				Success bool        `json:"success"`
+				Jobs    []*jobs.Job `json:"jobs"`
 			}{
 				Success: true,
 				Jobs:    all,
@@ -196,7 +196,7 @@ func Route(r chi.Router, runOpts *options.ServerConfig) {
 
 			w.Header().Set("Content-Type", "application/json")
 			// possible race condition, but not the kind that should matter
-			if _, exists := jobs.Jobs[msg.JobID]; !exists {
+			if _, exists := jobs.Jobs[jobs.URLSafeRefID(msg.JobID)]; !exists {
 				w.Write([]byte(
 					`{ "success": false, "error": "job does not exist" }` + "\n",
 				))
@@ -204,7 +204,7 @@ func Route(r chi.Router, runOpts *options.ServerConfig) {
 			}
 
 			// killing a job *should* always succeed ...right?
-			jobs.Remove(msg.JobID)
+			jobs.Remove(jobs.URLSafeRefID(msg.JobID))
 			w.Write([]byte(
 				`{ "success": true }` + "\n",
 			))
