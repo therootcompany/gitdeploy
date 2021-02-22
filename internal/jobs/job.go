@@ -1,38 +1,66 @@
-package api
+package jobs
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"git.rootprojects.org/root/gitdeploy/internal/log"
+	"git.rootprojects.org/root/gitdeploy/internal/options"
 	"git.rootprojects.org/root/gitdeploy/internal/webhooks"
 )
 
-// LogDir is where the logs should go
-var LogDir string
+var initialized = false
 
-// TmpDir is where the backlog files go
-var TmpDir string
+// Init starts the channel and cleanup routines
+func Init(runOpts *options.ServerConfig) {
+	if initialized {
+		panic(errors.New("should not double initialize 'jobs'"))
+	}
+	initialized = true
+
+	go func() {
+		// TODO read from backlog
+		for {
+			//hook := webhooks.Accept()
+			select {
+			case promotion := <-Promotions:
+				promote(webhooks.New(*promotion.Ref), promotion.PromoteTo, runOpts)
+			case hook := <-webhooks.Hooks:
+				debounce(webhooks.New(hook), runOpts)
+			case jobID := <-deathRow:
+				// should !nokill (so... should kill job on the spot?)
+				remove(jobID /*, false*/)
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			time.Sleep(time.Minute)
+
+			// TODO mutex here again (or switch to sync.Map)
+			staleJobIDs := []string{}
+			for jobID, job := range Recents {
+				if time.Now().Sub(job.CreatedAt) > time.Hour {
+					staleJobIDs = append(staleJobIDs, jobID)
+				}
+			}
+			// and here
+			for i := range staleJobIDs {
+				delete(Recents, staleJobIDs[i])
+			}
+		}
+	}()
+}
 
 // Promotions channel
 var Promotions = make(chan Promotion)
-
-func init() {
-	var err error
-	TmpDir, err = ioutil.TempDir("", "gitdeploy-*")
-	if nil != err {
-		fmt.Fprintf(os.Stderr, "could not create temporary directory")
-		os.Exit(1)
-		return
-	}
-	log.Printf("TEMP_DIR=%s", TmpDir)
-}
 
 // Promotion is a channel message
 type Promotion struct {
@@ -40,9 +68,17 @@ type Promotion struct {
 	Ref       *webhooks.Ref
 }
 
-var jobs = make(map[string]*HookJob)
-var recentJobs = make(map[string]*HookJob)
-var killers = make(chan string)
+// Jobs is the map of jobs
+var Jobs = make(map[string]*HookJob)
+
+// Recents are jobs that are dead, but recent
+var Recents = make(map[string]*HookJob)
+
+// deathRow is for jobs to be killed
+var deathRow = make(chan JobID)
+
+// JobID is a type alias
+type JobID = string
 
 // KillMsg describes which job to kill
 type KillMsg struct {
@@ -52,13 +88,41 @@ type KillMsg struct {
 
 // Job is the JSON we send back through the API about jobs
 type Job struct {
-	JobID     string       `json:"job_id"`
-	CreatedAt time.Time    `json:"created_at"`
-	GitRef    webhooks.Ref `json:"ref"`
-	Promote   bool         `json:"promote,omitempty"`
+	JobID     string        `json:"job_id"`
+	CreatedAt time.Time     `json:"created_at"`
+	GitRef    *webhooks.Ref `json:"ref"`
+	Promote   bool          `json:"promote,omitempty"`
 }
 
-func getEnvs(addr, jobID string, repoList string, hook webhooks.Ref) []string {
+// All returns all jobs, including active, recent, and (TODO) historical
+func All() []Job {
+	// again, possible race condition, but not one that much matters
+	jobsCopy := []Job{}
+	for jobID, job := range Jobs {
+		jobsCopy = append(jobsCopy, Job{
+			JobID:     jobID,
+			GitRef:    job.GitRef,
+			CreatedAt: job.CreatedAt,
+		})
+	}
+	// and here too
+	for jobID, job := range Recents {
+		jobsCopy = append(jobsCopy, Job{
+			JobID:     jobID,
+			GitRef:    job.GitRef,
+			CreatedAt: job.CreatedAt,
+		})
+	}
+
+	return jobsCopy
+}
+
+// Remove will put a job on death row
+func Remove(jobID JobID /*, nokill bool*/) {
+	deathRow <- jobID
+}
+
+func getEnvs(addr, jobID string, repoList string, hook *webhooks.Ref) []string {
 	hook.RepoID = getRepoID(hook.HTTPSURL)
 	hook.Timestamp = getTimestamp(hook.Timestamp)
 
@@ -104,9 +168,9 @@ func getEnvs(addr, jobID string, repoList string, hook webhooks.Ref) []string {
 	return envs
 }
 
-func getJobFilePath(baseDir string, hook webhooks.Ref, suffix string) (string, string, error) {
+func getJobFilePath(baseDir string, hook *webhooks.Ref, suffix string) (string, string, error) {
 	baseDir, _ = filepath.Abs(baseDir)
-	fileTime := hook.Timestamp.UTC().Format(TimeFile)
+	fileTime := hook.Timestamp.UTC().Format(options.TimeFile)
 	fileName := fileTime + "." + hook.RefName + "." + hook.Rev[:7] + suffix // ".log" or ".json"
 	fileDir := filepath.Join(baseDir, hook.RepoID)
 
@@ -115,7 +179,7 @@ func getJobFilePath(baseDir string, hook webhooks.Ref, suffix string) (string, s
 	return fileDir, fileName, err
 }
 
-func getJobFile(baseDir string, hook webhooks.Ref, suffix string) (*os.File, error) {
+func getJobFile(baseDir string, hook *webhooks.Ref, suffix string) (*os.File, error) {
 	repoDir, repoFile, err := getJobFilePath(baseDir, hook, suffix)
 	if nil != err {
 		//log.Printf("[warn] could not create log directory '%s': %v", repoDir, err)
@@ -127,7 +191,7 @@ func getJobFile(baseDir string, hook webhooks.Ref, suffix string) (*os.File, err
 	//return fmt.Sprintf("%s#%s", strings.ReplaceAll(hook.RepoID, "/", "-"), hook.RefName)
 }
 
-func getJobID(hook webhooks.Ref) string {
+func getJobID(hook *webhooks.Ref) string {
 	return base64.RawURLEncoding.EncodeToString([]byte(
 		fmt.Sprintf("%s#%s", hook.RepoID, hook.RefName),
 	))
@@ -167,15 +231,16 @@ func setOutput(logDir string, job *HookJob) *os.File {
 	return f
 }
 
-func removeJob(jobID string /*, nokill bool*/) {
+// Remove kills the job and moves it to recents
+func remove(jobID JobID /*, nokill bool*/) {
 	// TODO should have a mutex
-	job, exists := jobs[jobID]
+	job, exists := Jobs[jobID]
 	if !exists {
 		return
 	}
-	delete(jobs, jobID)
+	delete(Jobs, jobID)
 	// TODO write log as JSON
-	recentJobs[jobID] = job
+	Recents[jobID] = job
 
 	if nil == job.Cmd.ProcessState {
 		// is not yet finished

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"git.rootprojects.org/root/gitdeploy/internal/jobs"
 	"git.rootprojects.org/root/gitdeploy/internal/log"
 	"git.rootprojects.org/root/gitdeploy/internal/options"
 	"git.rootprojects.org/root/gitdeploy/internal/webhooks"
@@ -42,43 +43,8 @@ type Repo struct {
 
 // Route will set up the API and such
 func Route(r chi.Router, runOpts *options.ServerConfig) {
-	LogDir = os.Getenv("LOG_DIR")
 
-	go func() {
-		// TODO read from backlog
-		for {
-			//hook := webhooks.Accept()
-			select {
-			case promotion := <-Promotions:
-				gitref := webhooks.New(*promotion.Ref)
-				runPromote(*gitref, promotion.PromoteTo, runOpts)
-			case hook := <-webhooks.Hooks:
-				normalizeHook(&hook)
-				debounceHook(hook, runOpts)
-			case jobID := <-killers:
-				// should !nokill (so... should kill job on the spot?)
-				removeJob(jobID /*, false*/)
-			}
-		}
-	}()
-
-	go func() {
-		for {
-			time.Sleep(time.Minute)
-
-			// TODO mutex here again (or switch to sync.Map)
-			staleJobIDs := []string{}
-			for jobID, job := range recentJobs {
-				if time.Now().Sub(job.CreatedAt) > time.Hour {
-					staleJobIDs = append(staleJobIDs, jobID)
-				}
-			}
-			// and here
-			for i := range staleJobIDs {
-				delete(recentJobs, staleJobIDs[i])
-			}
-		}
-	}()
+	jobs.Init(runOpts)
 
 	webhooks.RouteHandlers(r)
 
@@ -147,7 +113,7 @@ func Route(r chi.Router, runOpts *options.ServerConfig) {
 			hooks, _ := WalkLogs(os.Getenv("LOG_DIR"))
 			for _, hook := range hooks {
 				//fmt.Printf("%#v\n\n", hook)
-				logName := hook.Timestamp.Format(TimeFile) + "." + hook.RefName + "." + hook.Rev
+				logName := hook.Timestamp.Format(options.TimeFile) + "." + hook.RefName + "." + hook.Rev
 				logURL := "/logs/" + hook.RepoID + "/" + logName
 				logStat, _ := os.Stat(filepath.Join("LOG_DIR", hook.RepoID, logName+".log"))
 				exitCode := 255
@@ -162,10 +128,10 @@ func Route(r chi.Router, runOpts *options.ServerConfig) {
 			}
 
 			// join with active jobs
-			for _, job := range jobs {
+			for _, job := range jobs.Jobs {
 				hook := job.GitRef
 				//fmt.Printf("%#v\n\n", hook)
-				logName := hook.Timestamp.Format(TimeFile) + "." + hook.RefName + "." + hook.Rev
+				logName := hook.Timestamp.Format(options.TimeFile) + "." + hook.RefName + "." + hook.Rev
 				logURL := "/logs/" + hook.RepoID + "/" + logName
 				logs = append(logs, HookResponse{
 					RepoID:    hook.RepoID,
@@ -203,30 +169,14 @@ func Route(r chi.Router, runOpts *options.ServerConfig) {
 		})
 
 		r.Get("/jobs", func(w http.ResponseWriter, r *http.Request) {
-			// again, possible race condition, but not one that much matters
-			jobsCopy := []Job{}
-			for jobID, job := range jobs {
-				jobsCopy = append(jobsCopy, Job{
-					JobID:     jobID,
-					GitRef:    job.GitRef,
-					CreatedAt: job.CreatedAt,
-				})
-			}
-			// and here too
-			for jobID, job := range recentJobs {
-				jobsCopy = append(jobsCopy, Job{
-					JobID:     jobID,
-					GitRef:    job.GitRef,
-					CreatedAt: job.CreatedAt,
-				})
-			}
+			all := jobs.All()
 
 			b, _ := json.Marshal(struct {
-				Success bool  `json:"success"`
-				Jobs    []Job `json:"jobs"`
+				Success bool       `json:"success"`
+				Jobs    []jobs.Job `json:"jobs"`
 			}{
 				Success: true,
-				Jobs:    jobsCopy,
+				Jobs:    all,
 			})
 			w.Write(append(b, '\n'))
 		})
@@ -237,7 +187,7 @@ func Route(r chi.Router, runOpts *options.ServerConfig) {
 			}()
 
 			decoder := json.NewDecoder(r.Body)
-			msg := &KillMsg{}
+			msg := &jobs.KillMsg{}
 			if err := decoder.Decode(msg); nil != err {
 				log.Printf("kill job invalid json:\n%v", err)
 				http.Error(w, "invalid json body", http.StatusBadRequest)
@@ -246,7 +196,7 @@ func Route(r chi.Router, runOpts *options.ServerConfig) {
 
 			w.Header().Set("Content-Type", "application/json")
 			// possible race condition, but not the kind that should matter
-			if _, exists := jobs[msg.JobID]; !exists {
+			if _, exists := jobs.Jobs[msg.JobID]; !exists {
 				w.Write([]byte(
 					`{ "success": false, "error": "job does not exist" }` + "\n",
 				))
@@ -254,7 +204,7 @@ func Route(r chi.Router, runOpts *options.ServerConfig) {
 			}
 
 			// killing a job *should* always succeed ...right?
-			killers <- msg.JobID
+			jobs.Remove(msg.JobID)
 			w.Write([]byte(
 				`{ "success": true }` + "\n",
 			))
@@ -269,8 +219,8 @@ func Route(r chi.Router, runOpts *options.ServerConfig) {
 
 		r.Post("/promote", func(w http.ResponseWriter, r *http.Request) {
 			decoder := json.NewDecoder(r.Body)
-			msg := &webhooks.Ref{}
-			if err := decoder.Decode(msg); nil != err {
+			msg := webhooks.Ref{}
+			if err := decoder.Decode(&msg); nil != err {
 				log.Printf("promotion job invalid json:\n%v", err)
 				http.Error(w, "invalid json body", http.StatusBadRequest)
 				return
@@ -295,10 +245,7 @@ func Route(r chi.Router, runOpts *options.ServerConfig) {
 			}
 
 			promoteTo := runOpts.Promotions[n]
-			Promotions <- Promotion{
-				PromoteTo: promoteTo,
-				Ref:       msg,
-			}
+			jobs.Promote(msg, promoteTo)
 
 			b, _ := json.Marshal(struct {
 				Success   bool   `json:"success"`

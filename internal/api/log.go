@@ -6,11 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"git.rootprojects.org/root/gitdeploy/internal/options"
 	"git.rootprojects.org/root/gitdeploy/internal/webhooks"
 )
-
-// TimeFile is a time format like RFC3339, but filename-friendly
-const TimeFile = "2006-01-02_15-04-05"
 
 // WalkLogs creates partial webhooks.Refs from walking the log dir
 func WalkLogs(logDir string) ([]webhooks.Ref, error) {
@@ -41,7 +39,7 @@ func WalkLogs(logDir string) ([]webhooks.Ref, error) {
 			return nil
 		}
 
-		ts, _ := time.ParseInLocation(TimeFile, rev[0], time.UTC)
+		ts, _ := time.ParseInLocation(options.TimeFile, rev[0], time.UTC)
 		hooks = append(hooks, webhooks.Ref{
 			HTTPSURL:  "//" + repoID + ".git",
 			RepoID:    repoID,

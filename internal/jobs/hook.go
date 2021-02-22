@@ -1,4 +1,4 @@
-package api
+package jobs
 
 import (
 	"os/exec"
@@ -14,7 +14,7 @@ type HookJob struct {
 	ID        string // {HTTPSURL}#{BRANCH}
 	Cmd       *exec.Cmd
 	ExitCode  *int
-	GitRef    webhooks.Ref
+	GitRef    *webhooks.Ref
 	CreatedAt time.Time
 	Logs      []Log
 	Report    JobReport
@@ -40,10 +40,4 @@ func getTimestamp(t time.Time) time.Time {
 		t = time.Now().UTC()
 	}
 	return t
-}
-
-// TODO NewRef
-func normalizeHook(hook *webhooks.Ref) {
-	hook.RepoID = getRepoID(hook.HTTPSURL)
-	hook.Timestamp = getTimestamp(hook.Timestamp)
 }
