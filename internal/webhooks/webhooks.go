@@ -27,10 +27,10 @@ type Ref struct {
 	Ref       string    `json:"ref"`      // refs/tags/v0.0.1, refs/heads/master
 	RefType   string    `json:"ref_type"` // tag, branch
 	RefName   string    `json:"ref_name"`
-	Branch    string    `json:"branch"` // deprecated
-	Tag       string    `json:"tag"`    // deprecated
 	Owner     string    `json:"repo_owner"`
 	Repo      string    `json:"repo_name"`
+	//Branch    string    `json:"branch"` // deprecated
+	//Tag       string    `json:"tag"`    // deprecated
 }
 
 // New returns a normalized Ref (Git reference)

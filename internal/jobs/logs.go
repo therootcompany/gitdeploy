@@ -1,4 +1,4 @@
-package api
+package jobs
 
 import (
 	"io/fs"
@@ -11,14 +11,14 @@ import (
 )
 
 // WalkLogs creates partial webhooks.Refs from walking the log dir
-func WalkLogs(logDir string) ([]webhooks.Ref, error) {
+func WalkLogs(runOpts *options.ServerConfig) ([]webhooks.Ref, error) {
 	hooks := []webhooks.Ref{}
-	if 0 == len(logDir) {
+	if 0 == len(runOpts.LogDir) {
 		return hooks, nil
 	}
 
-	pathLen := len(logDir + "/")
-	err := filepath.WalkDir(logDir, func(path string, d fs.DirEntry, err error) error {
+	pathLen := len(runOpts.LogDir + "/")
+	err := filepath.WalkDir(runOpts.LogDir, func(path string, d fs.DirEntry, err error) error {
 		if !d.Type().IsRegular() || '.' == path[0] || '_' == path[0] || '~' == path[0] {
 			return nil
 		}
@@ -54,4 +54,43 @@ func WalkLogs(logDir string) ([]webhooks.Ref, error) {
 	})
 
 	return hooks, err
+}
+
+// Log is a log message
+type Log struct {
+	Timestamp time.Time `json:"timestamp"`
+	Stderr    bool      `json:"stderr"`
+	Text      string    `json:"text"`
+}
+
+type outWriter struct {
+	//io.Writer
+	job *Job
+}
+
+func (w outWriter) Write(b []byte) (int, error) {
+	w.job.mux.Lock()
+	w.job.Logs = append(w.job.Logs, Log{
+		Timestamp: time.Now().UTC(),
+		Stderr:    false,
+		Text:      string(b),
+	})
+	w.job.mux.Unlock()
+	return len(b), nil
+}
+
+type errWriter struct {
+	//io.Writer
+	job *Job
+}
+
+func (w errWriter) Write(b []byte) (int, error) {
+	w.job.mux.Lock()
+	w.job.Logs = append(w.job.Logs, Log{
+		Timestamp: time.Now().UTC(),
+		Stderr:    true,
+		Text:      string(b),
+	})
+	w.job.mux.Unlock()
+	return len(b), nil
 }

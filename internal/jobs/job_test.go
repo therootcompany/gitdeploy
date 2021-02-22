@@ -97,7 +97,7 @@ func TestDebounce(t *testing.T) {
 	for i := range all {
 		// WARN: lock value copied
 		j := all[i]
-		fmt.Printf("[TEST] Job[%d]: %#v", i, *j.GitRef)
+		fmt.Printf("[TEST] Job[%d]: %#v\n", i, *j.GitRef)
 		if t0 == j.GitRef.Timestamp ||
 			t1 == j.GitRef.Timestamp ||
 			t2 == j.GitRef.Timestamp ||
@@ -157,7 +157,7 @@ func TestDebounce(t *testing.T) {
 	all = All()
 	for i := range all {
 		j := all[i]
-		fmt.Printf("[TEST] Job[%d]: %#v", i, *j.GitRef)
+		fmt.Printf("[TEST] Job[%d]: %#v\n", i, *j.GitRef)
 		if t4 == j.GitRef.Timestamp ||
 			r4 == j.GitRef.Rev {
 			t.Error(fmt.Errorf("should not find debounced jobs"))

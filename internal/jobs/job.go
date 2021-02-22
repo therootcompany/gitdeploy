@@ -123,7 +123,7 @@ type Job struct {
 
 // JobReport should have many items
 type JobReport struct {
-	Items []string
+	Items []string `json:"output"`
 }
 
 func getTimestamp(t time.Time) time.Time {
@@ -240,7 +240,7 @@ func getJobFile(baseDir string, hook *webhooks.Ref, suffix string) (*os.File, er
 	}
 
 	path := filepath.Join(repoDir, repoFile)
-	return os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0755)
+	return os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644)
 	//return fmt.Sprintf("%s#%s", strings.ReplaceAll(hook.RepoID, "/", "-"), hook.RefName)
 }
 
@@ -274,7 +274,8 @@ func setOutput(logDir string, job *Job) *os.File {
 		return nil
 	}
 
-	log.Printf("["+hook.RepoID+"#"+hook.RefName+"] logging to '%s'", f.Name())
+	cwd, _ := os.Getwd()
+	log.Printf("["+hook.RepoID+"#"+hook.RefName+"] logging to '.%s'", f.Name()[len(cwd):])
 	return f
 }
 
@@ -321,43 +322,4 @@ func expire(runOpts *options.ServerConfig) {
 		delete(Recents, staleJobIDs[i])
 	}
 	jobsTimersMux.Unlock()
-}
-
-// Log is a log message
-type Log struct {
-	Timestamp time.Time `json:"timestamp"`
-	Stderr    bool
-	Text      string
-}
-
-type outWriter struct {
-	//io.Writer
-	job *Job
-}
-
-func (w outWriter) Write(b []byte) (int, error) {
-	w.job.mux.Lock()
-	w.job.Logs = append(w.job.Logs, Log{
-		Timestamp: time.Now().UTC(),
-		Stderr:    false,
-		Text:      string(b),
-	})
-	w.job.mux.Unlock()
-	return len(b), nil
-}
-
-type errWriter struct {
-	//io.Writer
-	job *Job
-}
-
-func (w errWriter) Write(b []byte) (int, error) {
-	w.job.mux.Lock()
-	w.job.Logs = append(w.job.Logs, Log{
-		Timestamp: time.Now().UTC(),
-		Stderr:    true,
-		Text:      string(b),
-	})
-	w.job.mux.Unlock()
-	return len(b), nil
 }
