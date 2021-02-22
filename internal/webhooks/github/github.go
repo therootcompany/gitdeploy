@@ -14,7 +14,7 @@ import (
 	"github.com/go-chi/chi"
 	// TODO nix this dependency in favor of a lightweight X-Hub-Signature
 	// and JSON-to-Go-struct approach
-	"github.com/google/go-github/v32/github"
+	"github.com/google/go-github/v33/github"
 )
 
 func init() {

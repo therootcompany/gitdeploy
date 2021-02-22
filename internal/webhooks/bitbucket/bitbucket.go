@@ -14,7 +14,7 @@ import (
 	"git.rootprojects.org/root/gitdeploy/internal/webhooks"
 
 	"github.com/go-chi/chi"
-	"github.com/google/go-github/v32/github"
+	"github.com/google/go-github/v33/github"
 )
 
 func init() {

@@ -9,9 +9,9 @@ git.rootprojects.org/root/vfscopy
 ## explicit
 github.com/go-chi/chi
 github.com/go-chi/chi/middleware
-# github.com/google/go-github/v32 v32.1.0
+# github.com/google/go-github/v33 v33.0.0
 ## explicit
-github.com/google/go-github/v32/github
+github.com/google/go-github/v33/github
 # github.com/google/go-querystring v1.0.0
 github.com/google/go-querystring/query
 # github.com/joho/godotenv v1.3.0
