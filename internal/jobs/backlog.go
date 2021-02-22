@@ -45,7 +45,7 @@ func debounce(hook *webhooks.Ref, runOpts *options.ServerConfig) {
 		timer.Stop()
 	}
 	// this will not cause a mutual lock because it is async
-	timer = time.AfterFunc(2*time.Second, func() {
+	timer = time.AfterFunc(runOpts.DebounceDelay, func() {
 		fmt.Println("DEBUG [1] wait for jobs and timers")
 		jobsTimersMux.Lock()
 		defer jobsTimersMux.Unlock()

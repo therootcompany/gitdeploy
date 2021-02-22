@@ -170,6 +170,12 @@ func main() {
 			}
 			log.Printf("TEMP_DIR=%s", runOpts.TmpDir)
 		}
+		if 0 == runOpts.DebounceDelay {
+			runOpts.DebounceDelay = 2 * time.Second
+		}
+		if 0 == runOpts.StaleAge {
+			runOpts.StaleAge = 30 * time.Minute
+		}
 
 		if len(runOpts.RepoList) > 0 {
 			runOpts.RepoList = strings.ReplaceAll(runOpts.RepoList, ",", " ")

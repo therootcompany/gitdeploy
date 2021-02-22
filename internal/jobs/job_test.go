@@ -1,6 +1,7 @@
 package jobs
 
 import (
+	"io/ioutil"
 	"path/filepath"
 	"testing"
 	"time"
@@ -10,11 +11,17 @@ import (
 )
 
 func TestDebounce(t *testing.T) {
+	tmpDir, _ := ioutil.TempDir("", "gitdeploy-*")
 	runOpts := &options.ServerConfig{
-		Addr:        "localhost:4483",
-		ScriptsPath: "./testdata",
-		LogDir:      "./test-logs",
+		Addr:          "localhost:4483",
+		ScriptsPath:   "./testdata",
+		LogDir:        "./test-logs",
+		TmpDir:        tmpDir,
+		DebounceDelay: 10 * time.Millisecond,
+		StaleAge:      500 * time.Millisecond,
 	}
+	debounceDelay := 12 * time.Millisecond
+	jobDelay := 250 * time.Millisecond
 
 	logDir, _ := filepath.Abs(runOpts.LogDir)
 	t.Log("test debounce: " + logDir)
@@ -75,7 +82,7 @@ func TestDebounce(t *testing.T) {
 
 	// TODO make debounce time configurable
 	t.Log("sleep so job can debounce and start")
-	time.Sleep(2100 * time.Millisecond)
+	time.Sleep(debounceDelay)
 
 	t.Log("put another job on the queue while job is running")
 	// backlog debounce
@@ -102,14 +109,16 @@ func TestDebounce(t *testing.T) {
 	}
 
 	t.Log("sleep so 1st job can finish")
-	time.Sleep(2100 * time.Millisecond)
+	time.Sleep(jobDelay)
 	t.Log("sleep so backlog can debounce")
-	time.Sleep(2100 * time.Millisecond)
+	time.Sleep(debounceDelay)
 	t.Log("sleep so 2nd job can finish")
-	time.Sleep(2100 * time.Millisecond)
+	time.Sleep(jobDelay)
 
 	t.Log("sleep to ensure no more backlogs exist")
-	time.Sleep(2100 * time.Millisecond)
+	time.Sleep(jobDelay)
+	time.Sleep(debounceDelay)
+	time.Sleep(debounceDelay)
 
 	close(webhooks.Hooks)
 }

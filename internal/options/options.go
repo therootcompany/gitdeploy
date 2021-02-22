@@ -2,6 +2,7 @@ package options
 
 import (
 	"flag"
+	"time"
 )
 
 // Server is an instance of the config
@@ -9,15 +10,17 @@ var Server *ServerConfig
 
 // ServerConfig is an options struct
 type ServerConfig struct {
-	Addr        string
-	TrustProxy  bool
-	RepoList    string
-	Compress    bool
-	ServePath   string
-	ScriptsPath string
-	Promotions  []string
-	LogDir      string // where the job logs should go
-	TmpDir      string // where the backlog files go
+	Addr          string
+	TrustProxy    bool
+	RepoList      string
+	Compress      bool
+	ServePath     string
+	ScriptsPath   string
+	Promotions    []string
+	LogDir        string // where the job logs should go
+	TmpDir        string // where the backlog files go
+	DebounceDelay time.Duration
+	StaleAge      time.Duration // how old a dead job is before it's stale
 	// TODO use BacklogDir instead?
 }
 
