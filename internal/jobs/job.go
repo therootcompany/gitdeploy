@@ -47,7 +47,7 @@ func Init(runOpts *options.ServerConfig) {
 			// TODO mutex here again (or switch to sync.Map)
 			staleJobIDs := []string{}
 			for jobID, job := range Recents {
-				if time.Now().Sub(job.CreatedAt) > time.Hour {
+				if time.Now().Sub(job.CreatedAt) > runOpts.StaleAge {
 					staleJobIDs = append(staleJobIDs, jobID)
 				}
 			}
