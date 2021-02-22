@@ -1,13 +1,13 @@
 package jobs
 
 import (
-	"encoding/base64"
 	"errors"
-	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"git.rootprojects.org/root/gitdeploy/internal/log"
@@ -16,47 +16,59 @@ import (
 )
 
 var initialized = false
+var done = make(chan struct{})
 
-// Init starts the channel and cleanup routines
-func Init(runOpts *options.ServerConfig) {
+// Start starts the job loop, channels, and cleanup routines
+func Start(runOpts *options.ServerConfig) {
+	go Run(runOpts)
+}
+
+// Run starts the job loop and waits for it to be stopped
+func Run(runOpts *options.ServerConfig) {
+	log.Printf("Starting")
 	if initialized {
 		panic(errors.New("should not double initialize 'jobs'"))
 	}
 	initialized = true
 
-	go func() {
-		// TODO read from backlog
-		for {
-			//hook := webhooks.Accept()
-			select {
-			case promotion := <-Promotions:
-				promote(webhooks.New(*promotion.Ref), promotion.PromoteTo, runOpts)
-			case hook := <-webhooks.Hooks:
-				debounce(webhooks.New(hook), runOpts)
-			case jobID := <-deathRow:
-				// should !nokill (so... should kill job on the spot?)
-				remove(jobID /*, false*/)
-			}
-		}
-	}()
+	// TODO load the backlog from disk
 
-	go func() {
-		for {
-			time.Sleep(time.Minute)
-
-			// TODO mutex here again (or switch to sync.Map)
-			staleJobIDs := []string{}
-			for jobID, job := range Recents {
-				if time.Now().Sub(job.CreatedAt) > runOpts.StaleAge {
-					staleJobIDs = append(staleJobIDs, jobID)
-				}
-			}
-			// and here
-			for i := range staleJobIDs {
-				delete(Recents, staleJobIDs[i])
-			}
+	ticker := time.NewTicker(runOpts.StaleAge / 2)
+	for {
+		select {
+		case h := <-webhooks.Hooks:
+			hook := webhooks.New(h)
+			log.Printf("Saving to backlog and debouncing")
+			saveBacklog(hook, runOpts)
+			debounce(hook, runOpts)
+		case hook := <-debacklog:
+			log.Printf("Pulling from backlog and debouncing")
+			debounce(hook, runOpts)
+		case hook := <-debounced:
+			log.Printf("Debounced by timer and running")
+			run(hook, runOpts)
+		case jobID := <-deathRow:
+			// should !nokill (so... should kill job on the spot?)
+			log.Printf("Removing after running exited, or being killed")
+			remove(jobID /*, false*/)
+		case promotion := <-Promotions:
+			log.Printf("Promoting from %s to %s", promotion.GitRef.RefName, promotion.PromoteTo)
+			promote(webhooks.New(*promotion.GitRef), promotion.PromoteTo, runOpts)
+		case <-ticker.C:
+			log.Printf("Running cleanup for expired, exited jobs")
+			expire(runOpts)
+		case <-done:
+			log.Printf("Stopping")
+			// TODO kill jobs
+			ticker.Stop()
 		}
-	}()
+	}
+}
+
+// Stop will cancel the job loop and its timers
+func Stop() {
+	done <- struct{}{}
+	initialized = false
 }
 
 // Promotions channel
@@ -65,20 +77,26 @@ var Promotions = make(chan Promotion)
 // Promotion is a channel message
 type Promotion struct {
 	PromoteTo string
-	Ref       *webhooks.Ref
+	GitRef    *webhooks.Ref
 }
 
 // Jobs is the map of jobs
-var Jobs = make(map[string]*HookJob)
+var Jobs = make(map[URLSafeRefID]*Job)
 
 // Recents are jobs that are dead, but recent
-var Recents = make(map[string]*HookJob)
+var Recents = make(map[URLSafeRefID]*Job)
 
 // deathRow is for jobs to be killed
-var deathRow = make(chan JobID)
+var deathRow = make(chan URLSafeRefID)
 
-// JobID is a type alias
-type JobID = string
+// debounced is for jobs that are ready to run
+var debounced = make(chan *webhooks.Ref)
+
+// debacklog is for debouncing without saving in the backlog
+var debacklog = make(chan *webhooks.Ref)
+
+// URLSafeRefID is a newtype for the JobID
+type URLSafeRefID string
 
 // KillMsg describes which job to kill
 type KillMsg struct {
@@ -86,45 +104,80 @@ type KillMsg struct {
 	Kill  bool   `json:"kill"`
 }
 
-// Job is the JSON we send back through the API about jobs
+// Job represents a job started by the git webhook
+// and also the JSON we send back through the API about jobs
 type Job struct {
+	// normal json
+	StartedAt time.Time     `json:"started_at"`
 	JobID     string        `json:"job_id"`
-	CreatedAt time.Time     `json:"created_at"`
+	ExitCode  *int          `json:"exit_code"`
 	GitRef    *webhooks.Ref `json:"ref"`
 	Promote   bool          `json:"promote,omitempty"`
+	EndedAt   time.Time     `json:"ended_at,omitempty"`
+	// extra
+	Logs   []Log      `json:"logs"`
+	Report JobReport  `json:"report"`
+	Cmd    *exec.Cmd  `json:"-"`
+	mux    sync.Mutex `json:"-"`
+}
+
+// JobReport should have many items
+type JobReport struct {
+	Items []string
+}
+
+func getTimestamp(t time.Time) time.Time {
+	if t.IsZero() {
+		t = time.Now().UTC()
+	}
+	return t
 }
 
 // All returns all jobs, including active, recent, and (TODO) historical
-func All() []Job {
-	// again, possible race condition, but not one that much matters
-	jobsCopy := []Job{}
-	for jobID, job := range Jobs {
-		jobsCopy = append(jobsCopy, Job{
-			JobID:     jobID,
+func All() []*Job {
+	jobsCopy := []*Job{}
+
+	jobsTimersMux.Lock()
+	defer jobsTimersMux.Unlock()
+	for i := range Jobs {
+		job := Jobs[i]
+		jobCopy := &Job{
+			StartedAt: job.StartedAt,
+			JobID:     job.GitRef.GetRefID(),
 			GitRef:    job.GitRef,
-			CreatedAt: job.CreatedAt,
-		})
+			Promote:   job.Promote,
+			EndedAt:   job.EndedAt,
+		}
+		if nil != job.ExitCode {
+			jobCopy.ExitCode = &(*job.ExitCode)
+		}
+		jobsCopy = append(jobsCopy, jobCopy)
 	}
 	// and here too
-	for jobID, job := range Recents {
-		jobsCopy = append(jobsCopy, Job{
-			JobID:     jobID,
+	for i := range Recents {
+		job := Recents[i]
+		jobCopy := &Job{
+			StartedAt: job.StartedAt,
+			JobID:     job.GitRef.GetRefID(),
 			GitRef:    job.GitRef,
-			CreatedAt: job.CreatedAt,
-		})
+			Promote:   job.Promote,
+			EndedAt:   job.EndedAt,
+		}
+		if nil != job.ExitCode {
+			jobCopy.ExitCode = &(*job.ExitCode)
+		}
+		jobsCopy = append(jobsCopy, jobCopy)
 	}
 
 	return jobsCopy
 }
 
 // Remove will put a job on death row
-func Remove(jobID JobID /*, nokill bool*/) {
-	deathRow <- jobID
+func Remove(urlRefID URLSafeRefID /*, nokill bool*/) {
+	deathRow <- urlRefID
 }
 
 func getEnvs(addr, jobID string, repoList string, hook *webhooks.Ref) []string {
-	hook.RepoID = getRepoID(hook.HTTPSURL)
-	hook.Timestamp = getTimestamp(hook.Timestamp)
 
 	port := strings.Split(addr, ":")[1]
 
@@ -191,13 +244,7 @@ func getJobFile(baseDir string, hook *webhooks.Ref, suffix string) (*os.File, er
 	//return fmt.Sprintf("%s#%s", strings.ReplaceAll(hook.RepoID, "/", "-"), hook.RefName)
 }
 
-func getJobID(hook *webhooks.Ref) string {
-	return base64.RawURLEncoding.EncodeToString([]byte(
-		fmt.Sprintf("%s#%s", hook.RepoID, hook.RefName),
-	))
-}
-
-func setOutput(logDir string, job *HookJob) *os.File {
+func setOutput(logDir string, job *Job) *os.File {
 	var f *os.File = nil
 
 	defer func() {
@@ -232,8 +279,10 @@ func setOutput(logDir string, job *HookJob) *os.File {
 }
 
 // Remove kills the job and moves it to recents
-func remove(jobID JobID /*, nokill bool*/) {
+func remove(jobID URLSafeRefID /*, nokill bool*/) {
 	// TODO should have a mutex
+	jobsTimersMux.Lock()
+	defer jobsTimersMux.Unlock()
 	job, exists := Jobs[jobID]
 	if !exists {
 		return
@@ -249,11 +298,29 @@ func remove(jobID JobID /*, nokill bool*/) {
 			err := job.Cmd.Process.Kill()
 			log.Printf("error killing job:\n%v", err)
 		}
-	} else {
+	}
+	if nil != job.Cmd.ProcessState {
 		//*job.ExitCode = job.Cmd.ProcessState.ExitCode()
 		exitCode := job.Cmd.ProcessState.ExitCode()
 		job.ExitCode = &exitCode
 	}
+	job.EndedAt = time.Now()
+}
+
+func expire(runOpts *options.ServerConfig) {
+	// TODO mutex here again (or switch to sync.Map)
+	staleJobIDs := []URLSafeRefID{}
+	jobsTimersMux.Lock()
+	for jobID, job := range Recents {
+		if time.Now().Sub(job.GitRef.Timestamp) > runOpts.StaleAge {
+			staleJobIDs = append(staleJobIDs, jobID)
+		}
+	}
+	// and here
+	for i := range staleJobIDs {
+		delete(Recents, staleJobIDs[i])
+	}
+	jobsTimersMux.Unlock()
 }
 
 // Log is a log message
@@ -265,7 +332,7 @@ type Log struct {
 
 type outWriter struct {
 	//io.Writer
-	job *HookJob
+	job *Job
 }
 
 func (w outWriter) Write(b []byte) (int, error) {
@@ -281,7 +348,7 @@ func (w outWriter) Write(b []byte) (int, error) {
 
 type errWriter struct {
 	//io.Writer
-	job *HookJob
+	job *Job
 }
 
 func (w errWriter) Write(b []byte) (int, error) {
