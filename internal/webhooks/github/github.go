@@ -69,8 +69,8 @@ func InitWebhook(providername string, secretList *string, envname string) func()
 
 				switch e := event.(type) {
 				case *github.PushEvent:
-					var branch string
-					var tag string
+					//var branch string
+					//var tag string
 
 					ref := e.GetRef() // *e.Ref
 					parts := strings.Split(ref, "/")
@@ -80,10 +80,10 @@ func InitWebhook(providername string, secretList *string, envname string) func()
 					switch refType {
 					case "tags":
 						refType = "tag"
-						tag = refName
+						//tag = refName
 					case "heads":
 						refType = "branch"
-						branch = refName
+						//branch = refName
 					}
 
 					webhooks.Hook(webhooks.Ref{
@@ -94,10 +94,10 @@ func InitWebhook(providername string, secretList *string, envname string) func()
 						Ref:       ref,
 						RefType:   refType,
 						RefName:   refName,
-						Branch:    branch,
-						Tag:       tag,
 						Repo:      e.GetRepo().GetName(), // *e.Repo.Name
 						Owner:     e.GetRepo().GetOwner().GetLogin(),
+						//Branch:    branch,
+						//Tag:       tag,
 					})
 				/*
 					case *github.PullRequestEvent:

@@ -110,7 +110,7 @@ func Route(r chi.Router, runOpts *options.ServerConfig) {
 			// Walk LOG_DIR
 			// group by LOG_DIR/**/*.log
 			// TODO delete old logs 15d+?
-			hooks, _ := WalkLogs(os.Getenv("LOG_DIR"))
+			hooks, _ := jobs.WalkLogs(runOpts)
 			for _, hook := range hooks {
 				//fmt.Printf("%#v\n\n", hook)
 				logName := hook.Timestamp.Format(options.TimeFile) + "." + hook.RefName + "." + hook.Rev

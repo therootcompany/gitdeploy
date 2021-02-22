@@ -91,8 +91,8 @@ func InitWebhook(providername string, secretList *string, envname string) func()
 					return
 				}
 
-				var branch string
-				var tag string
+				//var branch string
+				//var tag string
 				var ref string
 
 				n := len(info.Push.Changes)
@@ -108,10 +108,10 @@ func InitWebhook(providername string, secretList *string, envname string) func()
 				refType := info.Push.Changes[0].New.Type
 				switch refType {
 				case "tag":
-					tag = refName
+					//tag = refName
 					ref = fmt.Sprintf("refs/tags/%s", refName)
 				case "branch":
-					branch = refName
+					//branch = refName
 					ref = fmt.Sprintf("refs/heads/%s", refName)
 				default:
 					log.Printf("unexpected bitbucket RefType %s\n", refType)
@@ -121,10 +121,10 @@ func InitWebhook(providername string, secretList *string, envname string) func()
 				switch refType {
 				case "tags":
 					refType = "tag"
-					tag = refName
+					//tag = refName
 				case "heads":
 					refType = "branch"
-					branch = refName
+					//branch = refName
 				}
 
 				var rev string
@@ -141,10 +141,10 @@ func InitWebhook(providername string, secretList *string, envname string) func()
 					Ref:      ref,
 					RefType:  refType,
 					RefName:  refName,
-					Branch:   branch,
-					Tag:      tag,
 					Repo:     info.Repository.Name,
 					Owner:    info.Repository.Workspace.Slug,
+					//Branch:   branch,
+					//Tag:      tag,
 				})
 			})
 		})

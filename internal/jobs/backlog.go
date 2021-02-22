@@ -189,6 +189,22 @@ func run(curHook *webhooks.Ref, runOpts *options.ServerConfig) {
 			_ = f.Close()
 		}
 
+		// replace the text log with a json log
+		if f, err := getJobFile(runOpts.LogDir, j.GitRef, ".json"); nil != err {
+			// f.Name() should be the full path
+			log.Printf("[warn] could not create log file '%s': %v", runOpts.LogDir, err)
+		} else {
+			enc := json.NewEncoder(f)
+			enc.SetIndent("", "  ")
+			if err := enc.Encode(j); nil != err {
+				log.Printf("[warn] could not encode json log '%s': %v", f.Name(), err)
+			} else {
+				dpath, fpath, _ := getJobFilePath(runOpts.LogDir, j.GitRef, ".log")
+				_ = os.Remove(filepath.Join(dpath, fpath))
+			}
+			_ = f.Close()
+		}
+
 		// waits for job to be declared completely dead
 		deathRow <- jobID
 
