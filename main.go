@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -156,6 +157,20 @@ func main() {
 		if 0 == len(runOpts.RepoList) {
 			runOpts.RepoList = os.Getenv("TRUST_REPOS")
 		}
+		if 0 == len(runOpts.LogDir) {
+			runOpts.LogDir = os.Getenv("LOG_DIR")
+		}
+		if 0 == len(runOpts.TmpDir) {
+			var err error
+			runOpts.TmpDir, err = ioutil.TempDir("", "gitdeploy-*")
+			if nil != err {
+				fmt.Fprintf(os.Stderr, "could not create temporary directory")
+				os.Exit(1)
+				return
+			}
+			log.Printf("TEMP_DIR=%s", runOpts.TmpDir)
+		}
+
 		if len(runOpts.RepoList) > 0 {
 			runOpts.RepoList = strings.ReplaceAll(runOpts.RepoList, ",", " ")
 			runOpts.RepoList = strings.ReplaceAll(runOpts.RepoList, "  ", " ")

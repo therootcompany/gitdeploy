@@ -1,7 +1,6 @@
-package api
+package jobs
 
 import (
-	"log"
 	"path/filepath"
 	"testing"
 	"time"
@@ -10,20 +9,15 @@ import (
 	"git.rootprojects.org/root/gitdeploy/internal/webhooks"
 )
 
-func init() {
-	log.Println("test job test")
-
-	LogDir = "./test-logs"
-}
-
 func TestDebounce(t *testing.T) {
-	logDir, _ := filepath.Abs(LogDir)
-	t.Log("test debounce: " + logDir)
-
 	runOpts := &options.ServerConfig{
 		Addr:        "localhost:4483",
 		ScriptsPath: "./testdata",
+		LogDir:      "./test-logs",
 	}
+
+	logDir, _ := filepath.Abs(runOpts.LogDir)
+	t.Log("test debounce: " + logDir)
 
 	// TODO move to Init() in job.go?
 	go func() {
@@ -34,12 +28,12 @@ func TestDebounce(t *testing.T) {
 			//hook := webhooks.Accept()
 			case hook := <-webhooks.Hooks:
 				t.Logf("start: hook accepted")
-				debounceHook(hook, runOpts)
+				debounce(webhooks.New(hook), runOpts)
 				t.Logf("start: hook completed")
-			case jobID := <-killers:
+			case jobID := <-deathRow:
 				t.Logf("kill: jobID accepted")
 				// !nokill signifies that the job should be forcefully killed
-				removeJob(jobID /*, false*/)
+				remove(jobID /*, false*/)
 				t.Logf("kill: jobID removed")
 			}
 		}

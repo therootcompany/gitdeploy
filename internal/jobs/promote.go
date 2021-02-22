@@ -1,4 +1,4 @@
-package api
+package jobs
 
 import (
 	"encoding/base64"
@@ -12,7 +12,16 @@ import (
 	"git.rootprojects.org/root/gitdeploy/internal/webhooks"
 )
 
-func runPromote(hook webhooks.Ref, promoteTo string, runOpts *options.ServerConfig) {
+// Promote will run the promote script
+func Promote(msg webhooks.Ref, promoteTo string) {
+	Promotions <- Promotion{
+		PromoteTo: promoteTo,
+		Ref:       &msg,
+	}
+}
+
+// promote will run the promote script
+func promote(hook *webhooks.Ref, promoteTo string, runOpts *options.ServerConfig) {
 	// TODO create an origin-branch tag with a timestamp?
 	jobID1 := base64.RawURLEncoding.EncodeToString([]byte(
 		fmt.Sprintf("%s#%s", hook.HTTPSURL, hook.RefName),
@@ -40,12 +49,12 @@ func runPromote(hook webhooks.Ref, promoteTo string, runOpts *options.ServerConf
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	if _, exists := jobs[jobID1]; exists {
+	if _, exists := Jobs[jobID1]; exists {
 		// TODO put promote in backlog
 		log.Printf("[promote] gitdeploy job already started for %s#%s\n", hook.HTTPSURL, hook.RefName)
 		return
 	}
-	if _, exists := jobs[jobID2]; exists {
+	if _, exists := Jobs[jobID2]; exists {
 		// TODO put promote in backlog
 		log.Printf("[promote] gitdeploy job already started for %s#%s\n", hook.HTTPSURL, promoteTo)
 		return
@@ -56,13 +65,13 @@ func runPromote(hook webhooks.Ref, promoteTo string, runOpts *options.ServerConf
 		return
 	}
 
-	jobs[jobID1] = &HookJob{
+	Jobs[jobID1] = &HookJob{
 		ID:        jobID2,
 		Cmd:       cmd,
 		GitRef:    hook,
 		CreatedAt: time.Now(),
 	}
-	jobs[jobID2] = &HookJob{
+	Jobs[jobID2] = &HookJob{
 		ID:        jobID2,
 		Cmd:       cmd,
 		GitRef:    hook,
@@ -72,8 +81,8 @@ func runPromote(hook webhooks.Ref, promoteTo string, runOpts *options.ServerConf
 	go func() {
 		log.Printf("gitdeploy promote for %s#%s started\n", hook.HTTPSURL, hook.RefName)
 		_ = cmd.Wait()
-		killers <- jobID1
-		killers <- jobID2
+		deathRow <- jobID1
+		deathRow <- jobID2
 		log.Printf("gitdeploy promote for %s#%s finished\n", hook.HTTPSURL, hook.RefName)
 		// TODO check for backlog
 	}()
