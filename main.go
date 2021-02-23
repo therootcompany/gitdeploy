@@ -173,8 +173,14 @@ func main() {
 		if 0 == runOpts.DebounceDelay {
 			runOpts.DebounceDelay = 2 * time.Second
 		}
-		if 0 == runOpts.StaleAge {
-			runOpts.StaleAge = 30 * time.Minute
+		if 0 == runOpts.StaleJobAge {
+			runOpts.StaleJobAge = 30 * time.Minute
+		}
+		if 0 == runOpts.StaleLogAge {
+			runOpts.StaleLogAge = 15 * 24 * time.Hour
+		}
+		if 0 == runOpts.ExpiredLogAge {
+			runOpts.ExpiredLogAge = 90 * 24 * time.Hour
 		}
 
 		if len(runOpts.RepoList) > 0 {

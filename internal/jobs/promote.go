@@ -21,10 +21,10 @@ func Promote(msg webhooks.Ref, promoteTo string) {
 // promote will run the promote script
 func promote(hook *webhooks.Ref, promoteTo string, runOpts *options.ServerConfig) {
 	// TODO create an origin-branch tag with a timestamp?
-	jobID1 := URLSafeRefID(hook.GetURLSafeRefID())
+	jobID1 := hook.GetRefID()
 	hookTo := *hook
 	hookTo.RefName = promoteTo
-	jobID2 := URLSafeRefID(hookTo.GetURLSafeRefID())
+	jobID2 := hookTo.GetRefID()
 
 	args := []string{
 		runOpts.ScriptsPath + "/promote.sh",
@@ -45,12 +45,12 @@ func promote(hook *webhooks.Ref, promoteTo string, runOpts *options.ServerConfig
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	if _, exists := Jobs[jobID1]; exists {
+	if _, ok := Actives.Load(jobID1); ok {
 		// TODO put promote in backlog
 		log.Printf("[promote] gitdeploy job already started for %s#%s\n", hook.HTTPSURL, hook.RefName)
 		return
 	}
-	if _, exists := Jobs[jobID2]; exists {
+	if _, ok := Actives.Load(jobID2); ok {
 		// TODO put promote in backlog
 		log.Printf("[promote] gitdeploy job already started for %s#%s\n", hook.HTTPSURL, promoteTo)
 		return
@@ -62,18 +62,18 @@ func promote(hook *webhooks.Ref, promoteTo string, runOpts *options.ServerConfig
 	}
 
 	now := time.Now()
-	Jobs[jobID1] = &Job{
+	Actives.Store(jobID1, &Job{
 		StartedAt: now,
 		Cmd:       cmd,
 		GitRef:    hook,
 		Promote:   true,
-	}
-	Jobs[jobID2] = &Job{
+	})
+	Actives.Store(jobID2, &Job{
 		StartedAt: now,
 		Cmd:       cmd,
 		GitRef:    hook,
 		Promote:   true,
-	}
+	})
 
 	go func() {
 		log.Printf("gitdeploy promote for %s#%s started\n", hook.HTTPSURL, hook.RefName)

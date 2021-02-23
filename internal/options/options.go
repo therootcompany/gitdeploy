@@ -20,7 +20,9 @@ type ServerConfig struct {
 	LogDir        string // where the job logs should go
 	TmpDir        string // where the backlog files go
 	DebounceDelay time.Duration
-	StaleAge      time.Duration // how old a dead job is before it's stale
+	StaleJobAge   time.Duration // how old a dead job is before it's stale
+	StaleLogAge   time.Duration
+	ExpiredLogAge time.Duration
 	// TODO use BacklogDir instead?
 }
 

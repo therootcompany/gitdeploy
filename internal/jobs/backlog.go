@@ -22,17 +22,14 @@ func Debounce(hook webhooks.Ref) {
 }
 
 var jobsTimersMux sync.Mutex
-var debounceTimers = make(map[string]*time.Timer)
+var debounceTimers = make(map[webhooks.RefID]*time.Timer)
 
 func debounce(hook *webhooks.Ref, runOpts *options.ServerConfig) {
-	// lock access to 'debounceTimers' and 'jobs'
-	//fmt.Println("DEBUG [0] wait for jobs and timers")
 	jobsTimersMux.Lock()
-	defer func() {
-		//fmt.Println("DEBUG [0] release jobs and timers")
-		jobsTimersMux.Unlock()
-	}()
-	if _, exists := Jobs[URLSafeRefID(hook.GetURLSafeRefID())]; exists {
+	defer jobsTimersMux.Unlock()
+
+	activeID := hook.GetRefID()
+	if _, ok := Actives.Load(activeID); ok {
 		log.Printf("Job in progress, not debouncing %s", hook)
 		return
 	}
@@ -66,6 +63,9 @@ func getBacklogFilePath(baseDir string, hook *webhooks.Ref) (string, string, err
 }
 
 func saveBacklog(hook *webhooks.Ref, runOpts *options.ServerConfig) {
+	pendingID := hook.GetRefID()
+	Pending.Store(pendingID, hook)
+
 	repoDir, repoFile, err := getBacklogFilePath(runOpts.TmpDir, hook)
 	if nil != err {
 		log.Printf("[WARN] could not create backlog dir %s:\n%v", repoDir, err)
@@ -85,13 +85,13 @@ func saveBacklog(hook *webhooks.Ref, runOpts *options.ServerConfig) {
 	}
 
 	replace := false
-	jobFile := filepath.Join(repoDir, repoFile)
-	if _, err := os.Stat(jobFile); nil == err {
+	backlogPath := filepath.Join(repoDir, repoFile)
+	if _, err := os.Stat(backlogPath); nil == err {
 		replace = true
-		_ = os.Remove(jobFile)
+		_ = os.Remove(backlogPath)
 	}
-	if err := os.Rename(f.Name(), jobFile); nil != err {
-		log.Printf("[WARN] rename backlog failed:\n%v", err)
+	if err := os.Rename(f.Name(), backlogPath); nil != err {
+		log.Printf("[WARN] rename backlog json failed:\n%v", err)
 		return
 	}
 
@@ -103,41 +103,53 @@ func saveBacklog(hook *webhooks.Ref, runOpts *options.ServerConfig) {
 }
 
 func run(curHook *webhooks.Ref, runOpts *options.ServerConfig) {
+	// because we want to lock the whole transaction all of the state
 	jobsTimersMux.Lock()
 	defer jobsTimersMux.Unlock()
 
-	jobID := URLSafeRefID(curHook.GetURLSafeRefID())
-	if _, exists := Jobs[jobID]; exists {
+	pendingID := curHook.GetRefID()
+	if _, ok := Actives.Load(pendingID); ok {
 		log.Printf("Job already in progress: %s", curHook.GetRefID())
 		return
 	}
 
+	var hook *webhooks.Ref
+	// Legacy, but would be nice to repurpose for resuming on reload
 	repoDir, repoFile, _ := getBacklogFilePath(runOpts.TmpDir, curHook)
-	jobFile := filepath.Join(repoDir, repoFile)
-
-	// TODO add mutex (should not affect temp files)
-	_ = os.Remove(jobFile + ".cur")
-	_ = os.Rename(jobFile, jobFile+".cur")
-	b, err := ioutil.ReadFile(jobFile + ".cur")
-	if nil != err {
-		if !os.IsNotExist(err) {
-			log.Printf("[warn] could not read backlog file %s:\n%v", repoFile, err)
+	backlogFile := filepath.Join(repoDir, repoFile)
+	if value, ok := Pending.Load(pendingID); ok {
+		hook = value.(*webhooks.Ref)
+		log.Printf("loaded from Pending state: %#v", hook)
+	} else {
+		// TODO add mutex (should not affect temp files)
+		_ = os.Remove(backlogFile + ".cur")
+		_ = os.Rename(backlogFile, backlogFile+".cur")
+		b, err := ioutil.ReadFile(backlogFile + ".cur")
+		if nil != err {
+			if !os.IsNotExist(err) {
+				log.Printf("[warn] could not read backlog file %s:\n%v", repoFile, err)
+			}
+			// doesn't exist => no backlog
+			log.Printf("[NO BACKLOG] no backlog for %s", repoFile)
+			return
 		}
-		// doesn't exist => no backlog
-		log.Printf("[NO BACKLOG] no backlog for %s", repoFile)
-		return
+
+		hook = &webhooks.Ref{}
+		if err := json.Unmarshal(b, hook); nil != err {
+			log.Printf("[warn] could not parse backlog file %s:\n%v", repoFile, err)
+			return
+		}
+		hook = webhooks.New(*hook)
+		log.Printf("loaded from file: %#v", hook)
 	}
 
-	hook := &webhooks.Ref{}
-	if err := json.Unmarshal(b, hook); nil != err {
-		log.Printf("[warn] could not parse backlog file %s:\n%v", repoFile, err)
-		return
-	}
-	hook = webhooks.New(*hook)
+	Pending.Delete(pendingID)
+	_ = os.Remove(backlogFile)
+	_ = os.Remove(backlogFile + ".cur")
 
 	env := os.Environ()
-	envs := getEnvs(runOpts.Addr, string(jobID), runOpts.RepoList, hook)
-	envs = append(envs, "GIT_DEPLOY_JOB_ID="+string(jobID))
+	envs := getEnvs(runOpts.Addr, string(pendingID), runOpts.RepoList, hook)
+	envs = append(envs, "GIT_DEPLOY_JOB_ID="+string(pendingID))
 
 	scriptPath, _ := filepath.Abs(runOpts.ScriptsPath + "/deploy.sh")
 	args := []string{
@@ -145,7 +157,7 @@ func run(curHook *webhooks.Ref, runOpts *options.ServerConfig) {
 		"--",
 		//strings.Join([]string{
 		scriptPath,
-		string(jobID),
+		string(pendingID),
 		hook.RefName,
 		hook.RefType,
 		hook.Owner,
@@ -154,7 +166,7 @@ func run(curHook *webhooks.Ref, runOpts *options.ServerConfig) {
 		//}, " "),
 	}
 
-	args2 := append([]string{"[" + hook.RepoID + "#" + hook.RefName + "]", "bash"}, args...)
+	args2 := append([]string{"[" + string(hook.GetRefID()) + "]", "bash"}, args...)
 	fmt.Println(strings.Join(args2, " "))
 	cmd := exec.Command("bash", args...)
 	cmd.Env = append(env, envs...)
@@ -167,7 +179,7 @@ func run(curHook *webhooks.Ref, runOpts *options.ServerConfig) {
 		Logs:      []Log{},
 		Promote:   false,
 	}
-	// TODO NewJob()
+	// TODO jobs.New()
 	// Sets cmd.Stdout and cmd.Stderr
 	f := setOutput(runOpts.LogDir, j)
 
@@ -176,7 +188,7 @@ func run(curHook *webhooks.Ref, runOpts *options.ServerConfig) {
 		return
 	}
 
-	Jobs[jobID] = j
+	Actives.Store(pendingID, j)
 
 	go func() {
 		log.Printf("Started job for %s", hook)
@@ -189,6 +201,8 @@ func run(curHook *webhooks.Ref, runOpts *options.ServerConfig) {
 			_ = f.Close()
 		}
 
+		// Switch ID to the more specific RevID
+		j.ID = string(j.GitRef.GetRevID())
 		// replace the text log with a json log
 		if f, err := getJobFile(runOpts.LogDir, j.GitRef, ".json"); nil != err {
 			// f.Name() should be the full path
@@ -199,14 +213,16 @@ func run(curHook *webhooks.Ref, runOpts *options.ServerConfig) {
 			if err := enc.Encode(j); nil != err {
 				log.Printf("[warn] could not encode json log '%s': %v", f.Name(), err)
 			} else {
-				dpath, fpath, _ := getJobFilePath(runOpts.LogDir, j.GitRef, ".log")
-				_ = os.Remove(filepath.Join(dpath, fpath))
+				logdir, logname, _ := getJobFilePath(runOpts.LogDir, j.GitRef, ".log")
+				_ = os.Remove(filepath.Join(logdir, logname))
 			}
 			_ = f.Close()
+			log.Printf("[DEBUG] wrote log to %s", f.Name())
 		}
+		j.Logs = []Log{}
 
-		// waits for job to be declared completely dead
-		deathRow <- jobID
+		// this will completely clear the finished job
+		deathRow <- pendingID
 
 		// debounces without saving in the backlog
 		// TODO move this into deathRow?

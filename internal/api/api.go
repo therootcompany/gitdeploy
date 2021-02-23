@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -103,61 +102,12 @@ func Route(r chi.Router, runOpts *options.ServerConfig) {
 			w.Write(append(b, '\n'))
 		})
 
-		r.Get("/logs", func(w http.ResponseWriter, r *http.Request) {
+		r.Get("/logs/{oldID}", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+
+			oldID := webhooks.URLSafeGitID(chi.URLParam(r, "oldID"))
 			// TODO add `since`
-			logs := []HookResponse{}
-
-			// Walk LOG_DIR
-			// group by LOG_DIR/**/*.log
-			// TODO delete old logs 15d+?
-			hooks, _ := jobs.WalkLogs(runOpts)
-			for _, hook := range hooks {
-				//fmt.Printf("%#v\n\n", hook)
-				logName := hook.Timestamp.Format(options.TimeFile) + "." + hook.RefName + "." + hook.Rev
-				logURL := "/logs/" + hook.RepoID + "/" + logName
-				logStat, _ := os.Stat(filepath.Join("LOG_DIR", hook.RepoID, logName+".log"))
-				exitCode := 255
-				logs = append(logs, HookResponse{
-					RepoID:    hook.RepoID,
-					CreatedAt: hook.Timestamp,
-					EndedAt:   logStat.ModTime(),
-					ExitCode:  &exitCode,
-					Log:       logName,
-					LogURL:    logURL,
-				})
-			}
-
-			// join with active jobs
-			for _, job := range jobs.Jobs {
-				hook := job.GitRef
-				//fmt.Printf("%#v\n\n", hook)
-				logName := hook.Timestamp.Format(options.TimeFile) + "." + hook.RefName + "." + hook.Rev
-				logURL := "/logs/" + hook.RepoID + "/" + logName
-				logs = append(logs, HookResponse{
-					RepoID:    hook.RepoID,
-					CreatedAt: hook.Timestamp,
-					//EndedAt: ,
-					ExitCode: job.ExitCode,
-					Log:      logName,
-					LogURL:   logURL,
-				})
-			}
-
-			b, _ := json.Marshal(struct {
-				Success bool `json:"success"`
-				Logs    []HookResponse
-			}{
-				Success: true,
-				Logs:    logs,
-			})
-			w.Write(append(b, '\n'))
-		})
-
-		r.Get("/logs/*", func(w http.ResponseWriter, r *http.Request) {
-			// TODO add ?since=
-			// TODO JSON logs
-			logPath := chi.URLParam(r, "*")
-			f, err := os.Open(filepath.Join(os.Getenv("LOG_DIR"), logPath))
+			j, err := jobs.LoadLogs(runOpts, oldID)
 			if nil != err {
 				w.WriteHeader(404)
 				w.Write([]byte(
@@ -165,8 +115,33 @@ func Route(r chi.Router, runOpts *options.ServerConfig) {
 				))
 				return
 			}
-			io.Copy(w, f)
+
+			b, _ := json.Marshal(struct {
+				Success bool `json:"success"`
+				jobs.Job
+			}{
+				Success: true,
+				Job:     *j,
+			})
+			w.Write(append(b, '\n'))
 		})
+
+		/*
+			r.Get("/logs/*", func(w http.ResponseWriter, r *http.Request) {
+				// TODO add ?since=
+				// TODO JSON logs
+				logPath := chi.URLParam(r, "*")
+				f, err := os.Open(filepath.Join(os.Getenv("LOG_DIR"), logPath))
+				if nil != err {
+					w.WriteHeader(404)
+					w.Write([]byte(
+						`{ "success": false, "error": "job log does not exist" }` + "\n",
+					))
+					return
+				}
+				io.Copy(w, f)
+			})
+		*/
 
 		r.Get("/jobs", func(w http.ResponseWriter, r *http.Request) {
 			all := jobs.All()
@@ -195,16 +170,17 @@ func Route(r chi.Router, runOpts *options.ServerConfig) {
 			}
 
 			w.Header().Set("Content-Type", "application/json")
-			// possible race condition, but not the kind that should matter
-			if _, exists := jobs.Jobs[jobs.URLSafeRefID(msg.JobID)]; !exists {
-				w.Write([]byte(
-					`{ "success": false, "error": "job does not exist" }` + "\n",
-				))
-				return
+			if _, ok := jobs.Actives.Load(webhooks.URLSafeRefID(msg.JobID)); !ok {
+				if _, ok := jobs.Pending.Load(webhooks.URLSafeRefID(msg.JobID)); !ok {
+					w.Write([]byte(
+						`{ "success": false, "error": "job does not exist" }` + "\n",
+					))
+					return
+				}
 			}
 
 			// killing a job *should* always succeed ...right?
-			jobs.Remove(jobs.URLSafeRefID(msg.JobID))
+			jobs.Remove(webhooks.URLSafeRefID(msg.JobID))
 			w.Write([]byte(
 				`{ "success": true }` + "\n",
 			))
