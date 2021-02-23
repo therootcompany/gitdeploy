@@ -2,7 +2,6 @@ package webhooks
 
 import (
 	"encoding/base64"
-	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -33,6 +32,21 @@ type Ref struct {
 	//Tag       string    `json:"tag"`    // deprecated
 }
 
+// RefID is a newtype string
+type RefID string
+
+// URLSafeRefID is a newtype string
+type URLSafeRefID string
+
+// RevID is a newtype string
+type RevID string
+
+// URLSafeRevID is a newtype string
+type URLSafeRevID string
+
+// URLSafeGitID is a newtype string
+type URLSafeGitID string
+
 // New returns a normalized Ref (Git reference)
 func New(r Ref) *Ref {
 	if len(r.HTTPSURL) > 0 {
@@ -47,24 +61,35 @@ func New(r Ref) *Ref {
 
 // String prints object as git.example.com#branch@rev
 func (h *Ref) String() string {
-	return h.RepoID + "@" + h.Rev[:7]
+	return string(h.GetRefID()) + "@" + h.Rev[:7]
 }
 
 // GetRefID returns a unique reference like "github.com/org/project#branch"
-func (h *Ref) GetRefID() string {
-	return h.RepoID + "#" + h.RefName
+func (h *Ref) GetRefID() RefID {
+	return RefID(h.RepoID + "#" + h.RefName)
 }
 
 // GetURLSafeRefID returns the URL-safe Base64 encoding of the RefID
-func (h *Ref) GetURLSafeRefID() string {
-	return base64.RawURLEncoding.EncodeToString([]byte(
-		fmt.Sprintf("%s#%s", h.RepoID, h.RefName),
-	))
+func (h *Ref) GetURLSafeRefID() URLSafeRefID {
+	return URLSafeRefID(
+		base64.RawURLEncoding.EncodeToString(
+			[]byte(h.GetRefID()),
+		),
+	)
 }
 
 // GetRevID returns a unique reference like "github.com/org/project#abcd7890"
-func (h *Ref) GetRevID() string {
-	return h.RepoID + "#" + h.Rev
+func (h *Ref) GetRevID() RevID {
+	return RevID(h.RepoID + "#" + h.Rev)
+}
+
+// GetURLSafeRevID returns the URL-safe Base64 encoding of the RevID
+func (h *Ref) GetURLSafeRevID() URLSafeRevID {
+	return URLSafeRevID(
+		base64.RawURLEncoding.EncodeToString(
+			[]byte(h.GetRevID()),
+		),
+	)
 }
 
 // Providers is a map of the git webhook providers

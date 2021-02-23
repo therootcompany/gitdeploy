@@ -1,6 +1,7 @@
 package jobs
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -17,30 +18,31 @@ var jobDelay time.Duration
 var runOpts *options.ServerConfig
 var logDir string
 
+var t0 = time.Now().UTC()
+
 func init() {
 	tmpDir, _ := ioutil.TempDir("", "gitdeploy-*")
 	runOpts = &options.ServerConfig{
 		Addr:          "localhost:4483",
 		ScriptsPath:   "./testdata",
-		LogDir:        "./test-logs",
+		LogDir:        "./test-logs/debounce",
 		TmpDir:        tmpDir,
 		DebounceDelay: 25 * time.Millisecond,
-		StaleAge:      5 * time.Minute,
-		//StaleAge:      50000 * time.Millisecond,
+		StaleJobAge:   5 * time.Minute,
+		StaleLogAge:   5 * time.Minute,
+		ExpiredLogAge: 10 * time.Minute,
 	}
 	logDir, _ = filepath.Abs(runOpts.LogDir)
 
 	os.Setenv("GIT_DEPLOY_TEST_WAIT", "0.1")
 	debounceDelay = 50 * time.Millisecond
 	jobDelay = 250 * time.Millisecond
+
+	Start(runOpts)
 }
 
 func TestDebounce(t *testing.T) {
 	t.Log("TestDebounce Log Dir: " + logDir)
-
-	Start(runOpts)
-
-	t0 := time.Now()
 
 	t1 := t0.Add(-100 * time.Second)
 	t2 := t0.Add(-90 * time.Second)
@@ -97,17 +99,15 @@ func TestDebounce(t *testing.T) {
 	for i := range all {
 		// WARN: lock value copied
 		j := all[i]
-		fmt.Printf("[TEST] Job[%d]: %#v\n", i, *j.GitRef)
-		if t0 == j.GitRef.Timestamp ||
-			t1 == j.GitRef.Timestamp ||
-			t2 == j.GitRef.Timestamp ||
-			r1 == j.GitRef.Rev ||
-			r2 == j.GitRef.Rev {
+		fmt.Printf("[TEST] A-Job[%d]: %s\n%#v\n", i, j.GitRef.Timestamp, *j.GitRef)
+		if t0.Equal(j.GitRef.Timestamp) ||
+			(t1.Equal(j.GitRef.Timestamp) && r1 == j.GitRef.Rev) ||
+			(t2.Equal(j.GitRef.Timestamp) && r2 == j.GitRef.Rev) {
 			t.Error(fmt.Errorf("should not find debounced jobs"))
 			t.Fail()
 			return
 		}
-		if t3 == j.GitRef.Timestamp || r3 == j.GitRef.Rev {
+		if t3.Equal(j.GitRef.Timestamp) && r3 == j.GitRef.Rev {
 			if nil != jobMatch {
 				t.Error(fmt.Errorf("should find only one instance of the 1st long-standing job"))
 				t.Fail()
@@ -157,14 +157,13 @@ func TestDebounce(t *testing.T) {
 	all = All()
 	for i := range all {
 		j := all[i]
-		fmt.Printf("[TEST] Job[%d]: %#v\n", i, *j.GitRef)
-		if t4 == j.GitRef.Timestamp ||
-			r4 == j.GitRef.Rev {
+		fmt.Printf("[TEST] B-Job[%d]: %s\n%#v\n", i, j.GitRef.Timestamp, *j.GitRef)
+		if t4.Equal(j.GitRef.Timestamp) && r4 == j.GitRef.Rev {
 			t.Error(fmt.Errorf("should not find debounced jobs"))
 			t.Fail()
 			return
 		}
-		if t5 == j.GitRef.Timestamp || r5 == j.GitRef.Rev {
+		if t5.Equal(j.GitRef.Timestamp) && r5 == j.GitRef.Rev {
 			if nil != jobMatch {
 				t.Error(fmt.Errorf("should find only one instance of the 2nd long-standing job"))
 				t.Fail()
@@ -174,7 +173,7 @@ func TestDebounce(t *testing.T) {
 		}
 	}
 	if nil == jobMatch {
-		t.Error(fmt.Errorf("should find the 2nd long-standing job"))
+		t.Error(fmt.Errorf("should find the 2nd long-standing job: %s %s", t5, r5))
 		t.Fail()
 		return
 	}
@@ -187,14 +186,75 @@ func TestDebounce(t *testing.T) {
 	time.Sleep(debounceDelay)
 	time.Sleep(debounceDelay)
 
-	Stop()
+	//Stop()
 }
 
-func TestActive(t *testing.T) {
-}
+func TestRecents(t *testing.T) {
+	/*
+		tmpDir, _ := ioutil.TempDir("", "gitdeploy-*")
+		runOpts = &options.ServerConfig{
+			Addr:          "localhost:4483",
+			ScriptsPath:   "./testdata",
+			LogDir:        "./test-logs/recents",
+			TmpDir:        tmpDir,
+			DebounceDelay: 1 * time.Millisecond,
+			StaleJobAge:   5 * time.Minute,
+			StaleLogAge:   5 * time.Minute,
+			ExpiredLogAge: 10 * time.Minute,
+		}
+		logDir, _ = filepath.Abs(runOpts.LogDir)
 
-func TestRecent(t *testing.T) {
-}
+		os.Setenv("GIT_DEPLOY_TEST_WAIT", "0.01")
+		debounceDelay := 50 * time.Millisecond
+		jobDelay := 250 * time.Millisecond
+	*/
 
-func TestStale(t *testing.T) {
+	//Start(runOpts)
+
+	t6 := t0.Add(-50 * time.Second)
+	r6 := "12345abcde"
+
+	// skip debounce
+	hook := webhooks.Ref{
+		Timestamp: t6,
+		RepoID:    "git.example.com/owner/repo",
+		HTTPSURL:  "https://git.example.com/owner/repo.git",
+		Rev:       r6,
+		RefName:   "master",
+		RefType:   "branch",
+		Owner:     "owner",
+		Repo:      "repo",
+	}
+	Debounce(hook)
+
+	// TODO make debounce time configurable
+	t.Log("sleep so job can debounce and start")
+	time.Sleep(debounceDelay)
+	time.Sleep(jobDelay)
+
+	urlRefID := webhooks.URLSafeGitID(
+		base64.RawURLEncoding.EncodeToString([]byte(hook.GetRefID())),
+	)
+	j, err := LoadLogs(runOpts, urlRefID)
+	if nil != err {
+		urlRevID := webhooks.URLSafeGitID(
+			base64.RawURLEncoding.EncodeToString([]byte(hook.GetRevID())),
+		)
+		j, err = LoadLogs(runOpts, urlRevID)
+		if nil != err {
+			t.Errorf("error loading logs: %v", err)
+			return
+		}
+		return
+	}
+
+	if len(j.Logs) < 3 {
+		t.Errorf("should have logs from test deploy script")
+		t.Fail()
+		return
+	}
+
+	t.Logf("Logs:\n%v", err)
+
+	//Stop()
 }
