@@ -247,7 +247,7 @@ func setOutput(logDir string, job *Job) *os.File {
 		// (noting that we want to keep Stdout vs Stderr and timing)
 		cmd := job.cmd
 		wout := &outWriter{job: job}
-		werr := &outWriter{job: job}
+		werr := &errWriter{job: job}
 		if nil != f {
 			cmd.Stdout = io.MultiWriter(f, wout)
 			cmd.Stderr = io.MultiWriter(f, werr)
