@@ -85,7 +85,7 @@ func WalkLogs(runOpts *options.ServerConfig) ([]*Job, error) {
 		// ExpiredLogAge can be 0 for testing,
 		// even when StaleLogAge is > 0
 		if age >= runOpts.ExpiredLogAge {
-			log.Printf("[info] remove log file: %s", logpath)
+			log.Printf("[gitdeploy] remove %s", logpath)
 			os.Remove(logpath)
 		}
 
