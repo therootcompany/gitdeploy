@@ -174,7 +174,7 @@ func main() {
 			runOpts.DebounceDelay = 2 * time.Second
 		}
 		if 0 == runOpts.StaleJobAge {
-			runOpts.StaleJobAge = 30 * time.Minute
+			runOpts.StaleJobAge = 3 * 24 * time.Hour
 		}
 		if 0 == runOpts.StaleLogAge {
 			runOpts.StaleLogAge = 15 * 24 * time.Hour
