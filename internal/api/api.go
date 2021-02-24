@@ -43,8 +43,6 @@ func RouteStopped(r chi.Router, runOpts *options.ServerConfig) {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// r.Body is always .Close()ed by Go's http server
 				r.Body = http.MaxBytesReader(w, r.Body, options.DefaultMaxBodySize)
-				// TODO admin auth middleware
-				log.Printf("TODO: handle authentication")
 				next.ServeHTTP(w, r)
 			})
 		})
@@ -95,6 +93,9 @@ func RouteStopped(r chi.Router, runOpts *options.ServerConfig) {
 
 			r.Get("/logs/{oldID}", func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
+
+				// TODO admin auth middleware
+				log.Printf("[TODO] handle AUTH (logs could be sensitive)")
 
 				oldID := webhooks.URLSafeGitID(chi.URLParam(r, "oldID"))
 				// TODO add `since`
@@ -149,7 +150,7 @@ func RouteStopped(r chi.Router, runOpts *options.ServerConfig) {
 
 			r.Post("/jobs", func(w http.ResponseWriter, r *http.Request) {
 				decoder := json.NewDecoder(r.Body)
-				msg := &jobs.KillMsg{}
+				msg := &KillMsg{}
 				if err := decoder.Decode(msg); nil != err {
 					log.Printf("kill job invalid json:\n%v", err)
 					http.Error(w, "invalid json body", http.StatusBadRequest)
@@ -271,4 +272,10 @@ type Repo struct {
 	ID         string   `json:"id"`
 	CloneURL   string   `json:"clone_url"`
 	Promotions []string `json:"_promotions"`
+}
+
+// KillMsg describes which job to kill
+type KillMsg struct {
+	JobID string `json:"job_id"`
+	Kill  bool   `json:"kill"`
 }

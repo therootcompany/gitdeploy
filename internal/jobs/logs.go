@@ -62,6 +62,10 @@ func WalkLogs(runOpts *options.ServerConfig) ([]*Job, error) {
 						// don't keep all the logs in memory
 						j.Logs = []Log{}
 						j.ID = string(j.GitRef.GetRevID())
+						if nil == j.EndedAt {
+							now := time.Now()
+							j.EndedAt = &now
+						}
 						oldJobs = append(oldJobs, j)
 					}
 				}
@@ -75,9 +79,11 @@ func WalkLogs(runOpts *options.ServerConfig) ([]*Job, error) {
 					RefName:   rev[1],
 					Rev:       rev[2],
 				}
+				now := time.Now()
 				oldJobs = append(oldJobs, &Job{
-					ID:     string(hook.GetRevID()),
-					GitRef: hook,
+					ID:      string(hook.GetRevID()),
+					GitRef:  hook,
+					EndedAt: &now,
 				})
 			}
 		}
@@ -85,7 +91,7 @@ func WalkLogs(runOpts *options.ServerConfig) ([]*Job, error) {
 		// ExpiredLogAge can be 0 for testing,
 		// even when StaleLogAge is > 0
 		if age >= runOpts.ExpiredLogAge {
-			log.Printf("[info] remove log file: %s", logpath)
+			log.Printf("[gitdeploy] remove %s", logpath)
 			os.Remove(logpath)
 		}
 
@@ -111,11 +117,10 @@ func LoadLogs(runOpts *options.ServerConfig, safeID webhooks.URLSafeGitID) (*Job
 	var f *os.File = nil
 	if value, ok := Actives.Load(refID); ok {
 		j := value.(*Job)
-		f, err = openJobFile(runOpts.LogDir, j.GitRef, ".json")
-		if nil != err {
-			return nil, err
-		}
-	} else if value, ok := Recents.Load(revID); ok {
+		return j, nil
+	}
+
+	if value, ok := Recents.Load(revID); ok {
 		j := value.(*Job)
 		f, err = openJobFile(runOpts.LogDir, j.GitRef, ".json")
 		if nil != err {

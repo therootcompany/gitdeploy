@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -28,7 +29,7 @@ func init() {
 	runOpts = &options.ServerConfig{
 		//Addr:          "localhost:4483",
 		ScriptsPath:   "./testdata",
-		LogDir:        "./test-logs/debounce",
+		LogDir:        "./test-logs/api",
 		TmpDir:        tmpDir,
 		DebounceDelay: 25 * time.Millisecond,
 		StaleJobAge:   5 * time.Minute,
@@ -69,16 +70,12 @@ func TestCallback(t *testing.T) {
 	}
 	// , _ := json.MarshallIndent(&hook , "", "  ")
 	jobs.Debounce(hook)
-
 	/*
 		body := bytes.NewReader(hook)
 		r := httptest.NewRequest("POST", "/api/local/webhook", body)
-
-		//dec := json.NewDecoder(r.Body)
-		//dec.Decode()
 	*/
 
-	t.Log("sleep so job can debounce, start, and finish")
+	// TODO use callback or chan chan to avoid sleeps?
 	time.Sleep(debounceDelay)
 	time.Sleep(jobDelay)
 
@@ -92,16 +89,32 @@ func TestCallback(t *testing.T) {
 	)
 	resp, err := http.Get(reqURL)
 	if nil != err {
-		t.Logf("[DEBUG] Response Error: %v", err)
+		t.Errorf("HTTP response error: %s\n%#v", reqURL, err)
 		return
 	}
 
-	t.Logf("[DEBUG] Request URL: %s", reqURL)
-	t.Logf("[DEBUG] Response Headers: %d %#v", resp.StatusCode, resp.Header)
-	b, err := ioutil.ReadAll(resp.Body)
-	if nil != err {
-		t.Logf("[DEBUG] Response Error: %v", err)
+	job := &jobs.Job{}
+	dec := json.NewDecoder(resp.Body)
+	if err := dec.Decode(job); nil != err {
+		t.Errorf(
+			"response decode error: %d %s\n%#v\n%#v",
+			resp.StatusCode, reqURL, resp.Header, err,
+		)
 		return
 	}
-	t.Logf("[DEBUG] Response Body: %v", string(b))
+
+	if len(job.Logs) < 3 {
+		t.Errorf("too few logs: %s\n%#v", reqURL, job)
+		return
+	}
+
+	if nil == job.Report || len(job.Report.Results) < 1 {
+		t.Errorf("too few results: %s\n%#v", reqURL, job)
+		return
+	}
+
+	if nil == job.ExitCode || 0 != *job.ExitCode {
+		t.Errorf("non-zero exit code: %s\n%#v", reqURL, job)
+		return
+	}
 }
