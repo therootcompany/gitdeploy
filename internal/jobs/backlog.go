@@ -42,13 +42,11 @@ func debounce(hook *webhooks.Ref, runOpts *options.ServerConfig) {
 	}
 	// this will not cause a mutual lock because it is async
 	debounceTimers[refID] = time.AfterFunc(runOpts.DebounceDelay, func() {
-		//fmt.Println("DEBUG [1] wait for jobs and timers")
 		jobsTimersMux.Lock()
 		delete(debounceTimers, refID)
 		jobsTimersMux.Unlock()
 
 		debounced <- hook
-		//fmt.Println("DEBUG [1] release jobs and timers")
 	})
 }
 
@@ -181,7 +179,7 @@ func run(curHook *webhooks.Ref, runOpts *options.ServerConfig) {
 	}
 	// TODO jobs.New()
 	// Sets cmd.Stdout and cmd.Stderr
-	f := setOutput(runOpts.LogDir, j)
+	txtFile := setOutput(runOpts.LogDir, j)
 
 	if err := cmd.Start(); nil != err {
 		log.Printf("gitdeploy exec error: %s\n", err)
@@ -197,28 +195,32 @@ func run(curHook *webhooks.Ref, runOpts *options.ServerConfig) {
 		} else {
 			log.Printf("gitdeploy job for %s#%s finished\n", hook.HTTPSURL, hook.RefName)
 		}
-		if nil != f {
-			_ = f.Close()
+		if nil != txtFile {
+			_ = txtFile.Close()
 		}
+
+		// TODO move to deathRow only?
+		updateExitStatus(j)
 
 		// Switch ID to the more specific RevID
 		j.ID = string(j.GitRef.GetRevID())
 		// replace the text log with a json log
-		if f, err := getJobFile(runOpts.LogDir, j.GitRef, ".json"); nil != err {
-			// f.Name() should be the full path
+		if jsonFile, err := getJobFile(runOpts.LogDir, j.GitRef, ".json"); nil != err {
+			// jsonFile.Name() should be the full path
 			log.Printf("[warn] could not create log file '%s': %v", runOpts.LogDir, err)
 		} else {
-			enc := json.NewEncoder(f)
+			enc := json.NewEncoder(jsonFile)
 			enc.SetIndent("", "  ")
 			if err := enc.Encode(j); nil != err {
-				log.Printf("[warn] could not encode json log '%s': %v", f.Name(), err)
+				log.Printf("[warn] could not encode json log '%s': %v", jsonFile.Name(), err)
 			} else {
 				logdir, logname, _ := getJobFilePath(runOpts.LogDir, j.GitRef, ".log")
 				_ = os.Remove(filepath.Join(logdir, logname))
 			}
-			_ = f.Close()
-			log.Printf("[DEBUG] wrote log to %s", f.Name())
+			_ = jsonFile.Close()
 		}
+
+		// TODO move to deathRow only?
 		j.Logs = []Log{}
 
 		// this will completely clear the finished job

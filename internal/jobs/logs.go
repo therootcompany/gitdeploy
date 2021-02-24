@@ -85,7 +85,7 @@ func WalkLogs(runOpts *options.ServerConfig) ([]*Job, error) {
 		// ExpiredLogAge can be 0 for testing,
 		// even when StaleLogAge is > 0
 		if age >= runOpts.ExpiredLogAge {
-			log.Printf("[DEBUG] remove log file: %s", logpath)
+			log.Printf("[info] remove log file: %s", logpath)
 			os.Remove(logpath)
 		}
 
@@ -94,6 +94,8 @@ func WalkLogs(runOpts *options.ServerConfig) ([]*Job, error) {
 
 	return oldJobs, err
 }
+
+//func GetReport(runOpts *options.ServerConfig, safeID webhooks.URLSafeGitID) (*Job, error) {}
 
 // LoadLogs will log logs for a job
 func LoadLogs(runOpts *options.ServerConfig, safeID webhooks.URLSafeGitID) (*Job, error) {
@@ -127,7 +129,6 @@ func LoadLogs(runOpts *options.ServerConfig, safeID webhooks.URLSafeGitID) (*Job
 	dec := json.NewDecoder(f)
 	j := &Job{}
 	if err := dec.Decode(j); nil != err {
-		log.Printf("[DEBUG] decode error: %v", err)
 		return nil, errors.New("couldn't read log file")
 	}
 	j.ID = string(gitID)
