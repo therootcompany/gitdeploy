@@ -40,9 +40,9 @@ type Job struct {
 	PromoteTo string        `json:"promote_to,omitempty"` // empty when deploy and test
 	Promote   bool          `json:"promote,omitempty"`    // empty when deploy and test
 	EndedAt   time.Time     `json:"ended_at,omitempty"`   // empty when running
-	ExitCode  *int          `json:"exit_code"`            // empty when running
+	ExitCode  *int          `json:"exit_code,omitempty"`  // empty when running
 	// full json
-	Logs   []Log   `json:"logs"`             // exist when requested
+	Logs   []Log   `json:"logs,omitempty"`   // exist when requested
 	Report *Report `json:"report,omitempty"` // empty unless given
 	// internal only
 	cmd *exec.Cmd  `json:"-"`
