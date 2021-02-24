@@ -70,7 +70,8 @@ func promote(hook *webhooks.Ref, promoteTo string, runOpts *options.ServerConfig
 		return
 	}
 
-	now := time.Now()
+	t := time.Now()
+	now := &t
 	promoteID := hook.RepoID + "#" + hook.RefName + ".." + promoteTo
 	Actives.Store(jobID1, &Job{
 		StartedAt: now,

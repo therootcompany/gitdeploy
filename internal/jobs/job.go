@@ -34,12 +34,12 @@ var Recents sync.Map
 // and also the JSON we send back through the API about jobs
 type Job struct {
 	// normal json
-	StartedAt time.Time     `json:"started_at,omitempty"` // empty when pending
+	StartedAt *time.Time    `json:"started_at,omitempty"` // empty when pending
 	ID        string        `json:"id"`                   // could be URLSafeRefID or URLSafeRevID
 	GitRef    *webhooks.Ref `json:"ref"`                  // always present
 	PromoteTo string        `json:"promote_to,omitempty"` // empty when deploy and test
 	Promote   bool          `json:"promote,omitempty"`    // empty when deploy and test
-	EndedAt   time.Time     `json:"ended_at,omitempty"`   // empty when running
+	EndedAt   *time.Time    `json:"ended_at,omitempty"`   // empty when running
 	ExitCode  *int          `json:"exit_code,omitempty"`  // empty when running
 	// full json
 	Logs   []Log   `json:"logs,omitempty"`   // exist when requested
@@ -421,7 +421,7 @@ func run(curHook *webhooks.Ref, runOpts *options.ServerConfig) {
 
 	now := time.Now()
 	j := &Job{
-		StartedAt: now,
+		StartedAt: &now,
 		cmd:       cmd,
 		GitRef:    hook,
 		Logs:      []Log{},
@@ -565,7 +565,8 @@ func updateExitStatus(job *Job) {
 		exitCode := job.cmd.ProcessState.ExitCode()
 		job.ExitCode = &exitCode
 	}
-	job.EndedAt = time.Now()
+	now := time.Now()
+	job.EndedAt = &now
 }
 
 func expire(runOpts *options.ServerConfig) {

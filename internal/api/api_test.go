@@ -29,7 +29,7 @@ func init() {
 	runOpts = &options.ServerConfig{
 		//Addr:          "localhost:4483",
 		ScriptsPath:   "./testdata",
-		LogDir:        "./test-logs/debounce",
+		LogDir:        "./test-logs/api",
 		TmpDir:        tmpDir,
 		DebounceDelay: 25 * time.Millisecond,
 		StaleJobAge:   5 * time.Minute,

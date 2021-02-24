@@ -171,7 +171,7 @@ func main() {
 			log.Printf("TEMP_DIR=%s", runOpts.TmpDir)
 		}
 		if 0 == runOpts.DebounceDelay {
-			runOpts.DebounceDelay = 2 * time.Second
+			runOpts.DebounceDelay = 5 * time.Second
 		}
 		if 0 == runOpts.StaleJobAge {
 			runOpts.StaleJobAge = 3 * 24 * time.Hour
