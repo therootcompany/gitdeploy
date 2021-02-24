@@ -10,6 +10,15 @@ import (
 	"git.rootprojects.org/root/gitdeploy/internal/webhooks"
 )
 
+// Promotions channel
+var Promotions = make(chan Promotion)
+
+// Promotion is a channel message
+type Promotion struct {
+	PromoteTo string
+	GitRef    *webhooks.Ref
+}
+
 // Promote will run the promote script
 func Promote(msg webhooks.Ref, promoteTo string) {
 	Promotions <- Promotion{
@@ -62,17 +71,30 @@ func promote(hook *webhooks.Ref, promoteTo string, runOpts *options.ServerConfig
 	}
 
 	now := time.Now()
+	promoteID := hook.RepoID + "#" + hook.RefName + ".." + promoteTo
 	Actives.Store(jobID1, &Job{
 		StartedAt: now,
-		Cmd:       cmd,
+		ID:        promoteID,
 		GitRef:    hook,
-		Promote:   true,
+		PromoteTo: promoteTo,
+		Promote:   true, // deprecated
+		cmd:       cmd,
 	})
 	Actives.Store(jobID2, &Job{
 		StartedAt: now,
-		Cmd:       cmd,
+		ID:        promoteID,
 		GitRef:    hook,
-		Promote:   true,
+		PromoteTo: promoteTo,
+		Promote:   true, // deprecated
+		cmd:       cmd,
+	})
+	Actives.Store(promoteID, &Job{
+		StartedAt: now,
+		ID:        promoteID,
+		GitRef:    hook,
+		PromoteTo: promoteTo,
+		Promote:   true, // deprecated
+		cmd:       cmd,
 	})
 
 	go func() {
@@ -80,6 +102,7 @@ func promote(hook *webhooks.Ref, promoteTo string, runOpts *options.ServerConfig
 		_ = cmd.Wait()
 		deathRow <- jobID1
 		deathRow <- jobID2
+		deathRow <- webhooks.RefID(promoteID)
 		log.Printf("gitdeploy promote for %s#%s finished\n", hook.HTTPSURL, hook.RefName)
 		// TODO check for backlog
 	}()

@@ -2,7 +2,6 @@ package jobs
 
 import (
 	"encoding/base64"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -90,7 +89,7 @@ func TestDebounce(t *testing.T) {
 		Repo:      "repo",
 	})
 
-	t.Log("sleep so job can debounce and start")
+	//t.Log("sleep so job can debounce and start")
 	time.Sleep(debounceDelay)
 
 	var jobMatch *Job
@@ -98,17 +97,17 @@ func TestDebounce(t *testing.T) {
 	for i := range all {
 		// WARN: lock value copied
 		j := all[i]
-		fmt.Printf("[TEST] A-Job[%d]: %s\n%#v\n", i, j.GitRef.Timestamp, *j.GitRef)
+		//t.Logf("[TEST] A-Job[%d]: %s\n%#v\n", i, j.GitRef.Timestamp, *j.GitRef)
 		if t0.Equal(j.GitRef.Timestamp) ||
 			(t1.Equal(j.GitRef.Timestamp) && r1 == j.GitRef.Rev) ||
 			(t2.Equal(j.GitRef.Timestamp) && r2 == j.GitRef.Rev) {
-			t.Error(fmt.Errorf("should not find debounced jobs"))
+			t.Errorf("should not find debounced jobs")
 			t.Fail()
 			return
 		}
 		if t3.Equal(j.GitRef.Timestamp) && r3 == j.GitRef.Rev {
 			if nil != jobMatch {
-				t.Error(fmt.Errorf("should find only one instance of the 1st long-standing job"))
+				t.Errorf("should find only one instance of the 1st long-standing job")
 				t.Fail()
 				return
 			}
@@ -116,12 +115,12 @@ func TestDebounce(t *testing.T) {
 		}
 	}
 	if nil == jobMatch {
-		t.Error(fmt.Errorf("should find the 1st long-standing job"))
+		t.Errorf("should find the 1st long-standing job")
 		t.Fail()
 		return
 	}
 
-	t.Log("put another job on the queue while job is running")
+	//t.Log("put another job on the queue while job is running")
 	// backlog debounce
 	Debounce(webhooks.Ref{
 		Timestamp: t4,
@@ -145,10 +144,10 @@ func TestDebounce(t *testing.T) {
 		Repo:      "repo",
 	})
 
-	t.Log("sleep so 1st job can finish")
+	//t.Log("sleep so 1st job can finish")
 	time.Sleep(jobDelay)
 	time.Sleep(jobDelay)
-	t.Log("sleep so backlog can debounce")
+	//t.Log("sleep so backlog can debounce")
 	time.Sleep(debounceDelay)
 
 	//var j *Job
@@ -156,15 +155,15 @@ func TestDebounce(t *testing.T) {
 	all = All()
 	for i := range all {
 		j := all[i]
-		fmt.Printf("[TEST] B-Job[%d]: %s\n%#v\n", i, j.GitRef.Timestamp, *j.GitRef)
+		//t.Logf("[TEST] B-Job[%d]: %s\n%#v\n", i, j.GitRef.Timestamp, *j.GitRef)
 		if t4.Equal(j.GitRef.Timestamp) && r4 == j.GitRef.Rev {
-			t.Error(fmt.Errorf("should not find debounced jobs"))
+			t.Errorf("should not find debounced jobs")
 			t.Fail()
 			return
 		}
 		if t5.Equal(j.GitRef.Timestamp) && r5 == j.GitRef.Rev {
 			if nil != jobMatch {
-				t.Error(fmt.Errorf("should find only one instance of the 2nd long-standing job"))
+				t.Errorf("should find only one instance of the 2nd long-standing job")
 				t.Fail()
 				return
 			}
@@ -172,15 +171,15 @@ func TestDebounce(t *testing.T) {
 		}
 	}
 	if nil == jobMatch {
-		t.Error(fmt.Errorf("should find the 2nd long-standing job: %s %s", t5, r5))
+		t.Errorf("should find the 2nd long-standing job: %s %s", t5, r5)
 		t.Fail()
 		return
 	}
 
-	t.Log("sleep so 2nd job can finish")
+	//t.Log("sleep so 2nd job can finish")
 	time.Sleep(jobDelay)
 
-	t.Log("sleep to ensure no more backlogs exist")
+	//t.Log("sleep to ensure no more backlogs exist")
 	time.Sleep(jobDelay)
 	time.Sleep(debounceDelay)
 	time.Sleep(debounceDelay)
@@ -226,7 +225,7 @@ func TestRecents(t *testing.T) {
 	}
 	Debounce(hook)
 
-	t.Log("sleep so job can debounce and start")
+	//t.Log("sleep so job can debounce and start")
 	time.Sleep(debounceDelay)
 	time.Sleep(jobDelay)
 
@@ -247,7 +246,7 @@ func TestRecents(t *testing.T) {
 	}
 
 	if len(j.Logs) < 3 {
-		t.Errorf("should have logs from test deploy script")
+		t.Errorf("should have logs from test deploy script: %#v", j.Logs)
 		t.Fail()
 		return
 	}
@@ -258,9 +257,9 @@ func TestRecents(t *testing.T) {
 		return
 	}
 
-	t.Logf("[DEBUG] Report:\n%#v", j.Report)
+	//t.Logf("[DEBUG] Report:\n%#v", j.Report)
 
-	t.Logf("Logs:\n%v", err)
+	//t.Logf("Logs:\n%v", err)
 
 	//Stop()
 }
