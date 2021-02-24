@@ -90,7 +90,6 @@ func TestDebounce(t *testing.T) {
 		Repo:      "repo",
 	})
 
-	// TODO make debounce time configurable
 	t.Log("sleep so job can debounce and start")
 	time.Sleep(debounceDelay)
 
@@ -227,7 +226,6 @@ func TestRecents(t *testing.T) {
 	}
 	Debounce(hook)
 
-	// TODO make debounce time configurable
 	t.Log("sleep so job can debounce and start")
 	time.Sleep(debounceDelay)
 	time.Sleep(jobDelay)
@@ -253,6 +251,14 @@ func TestRecents(t *testing.T) {
 		t.Fail()
 		return
 	}
+
+	if nil == j.ExitCode || 0 != *j.ExitCode {
+		t.Errorf("should zero exit status")
+		t.Fail()
+		return
+	}
+
+	t.Logf("[DEBUG] Report:\n%#v", j.Report)
 
 	t.Logf("Logs:\n%v", err)
 

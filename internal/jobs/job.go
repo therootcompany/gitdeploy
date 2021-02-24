@@ -19,6 +19,30 @@ import (
 var initialized = false
 var done = make(chan struct{})
 
+// Promotions channel
+var Promotions = make(chan Promotion)
+
+// Pending is the map of backlog jobs
+// map[webhooks.RefID]*webhooks.GitRef
+var Pending sync.Map
+
+// Actives is the map of jobs
+// map[webhooks.RefID]*Job
+var Actives sync.Map
+
+// Recents are jobs that are dead, but recent
+// map[webhooks.RevID]*Job
+var Recents sync.Map
+
+// deathRow is for jobs to be killed
+var deathRow = make(chan webhooks.RefID)
+
+// debounced is for jobs that are ready to run
+var debounced = make(chan *webhooks.Ref)
+
+// debacklog is for debouncing without saving in the backlog
+var debacklog = make(chan *webhooks.Ref)
+
 // Start starts the job loop, channels, and cleanup routines
 func Start(runOpts *options.ServerConfig) {
 	go Run(runOpts)
@@ -82,35 +106,11 @@ func Stop() {
 	initialized = false
 }
 
-// Promotions channel
-var Promotions = make(chan Promotion)
-
 // Promotion is a channel message
 type Promotion struct {
 	PromoteTo string
 	GitRef    *webhooks.Ref
 }
-
-// Pending is the map of backlog jobs
-// map[webhooks.RefID]*webhooks.GitRef
-var Pending sync.Map
-
-// Actives is the map of jobs
-// map[webhooks.RefID]*Job
-var Actives sync.Map
-
-// Recents are jobs that are dead, but recent
-// map[webhooks.RevID]*Job
-var Recents sync.Map
-
-// deathRow is for jobs to be killed
-var deathRow = make(chan webhooks.RefID)
-
-// debounced is for jobs that are ready to run
-var debounced = make(chan *webhooks.Ref)
-
-// debacklog is for debouncing without saving in the backlog
-var debacklog = make(chan *webhooks.Ref)
 
 // KillMsg describes which job to kill
 type KillMsg struct {
@@ -130,14 +130,18 @@ type Job struct {
 	EndedAt   time.Time     `json:"ended_at,omitempty"`   // empty when running
 	// extra
 	Logs   []Log      `json:"logs"`             // exist when requested
-	Report Report     `json:"report,omitempty"` // empty unless given
+	Report *Report    `json:"report,omitempty"` // empty unless given
 	Cmd    *exec.Cmd  `json:"-"`
 	mux    sync.Mutex `json:"-"`
 }
 
 // Report should have many items
 type Report struct {
-	Results []string `json:"results"`
+	Name    string   `json:"name"`
+	Status  string   `json:"status,omitempty"`
+	Message string   `json:"message,omitempty"`
+	Detail  string   `json:"detail,omitempty"`
+	Results []Report `json:"results,omitempty"`
 }
 
 // All returns all jobs, including active, recent, and (TODO) historical
@@ -195,6 +199,26 @@ func All() []*Job {
 	return jobsCopy
 }
 
+// SetReport will update jobs' logs
+func SetReport(urlRefID webhooks.URLSafeRefID, report *Report) error {
+	b, err := base64.RawURLEncoding.DecodeString(string(urlRefID))
+	if nil != err {
+		return err
+	}
+	refID := webhooks.RefID(b)
+
+	value, ok := Actives.Load(refID)
+	if !ok {
+		return errors.New("active job not found by " + string(refID))
+	}
+	job := value.(*Job)
+
+	job.Report = report
+	Actives.Store(refID, job)
+
+	return nil
+}
+
 // Remove will put a job on death row
 func Remove(gitID webhooks.URLSafeRefID /*, nokill bool*/) {
 	activeID, err :=
@@ -213,7 +237,7 @@ func getEnvs(addr, activeID string, repoList string, hook *webhooks.Ref) []strin
 	envs := []string{
 		"GIT_DEPLOY_JOB_ID=" + activeID,
 		"GIT_DEPLOY_TIMESTAMP=" + hook.Timestamp.Format(time.RFC3339),
-		"GIT_DEPLOY_CALLBACK_URL=" + "http://localhost:" + port + "/api/jobs/" + activeID,
+		"GIT_DEPLOY_CALLBACK_URL=" + "http://localhost:" + port + "/api/local/jobs/" + string(hook.GetURLSafeRefID()),
 		"GIT_REF_NAME=" + hook.RefName,
 		"GIT_REF_TYPE=" + hook.RefType,
 		"GIT_REPO_ID=" + hook.RepoID,
@@ -321,23 +345,30 @@ func remove(activeID webhooks.RefID /*, nokill bool*/) {
 
 	value, ok := Actives.Load(activeID)
 	if !ok {
+		log.Printf("[warn] could not find job to kill by RefID %s", activeID)
 		return
 	}
 	job := value.(*Job)
 	Actives.Delete(activeID)
 
-	// JSON should have been written to disk by this point
-	job.Logs = []Log{}
 	// transition to RevID for non-active, non-pending jobs
 	job.ID = string(job.GitRef.GetRevID())
 	Recents.Store(job.GitRef.GetRevID(), job)
 
+	updateExitStatus(job)
+
+	// JSON should have been written to disk by this point
+	job.Logs = []Log{}
+}
+
+func updateExitStatus(job *Job) {
 	if nil == job.Cmd.ProcessState {
 		// is not yet finished
 		if nil != job.Cmd.Process {
 			// but definitely was started
-			err := job.Cmd.Process.Kill()
-			log.Printf("error killing job:\n%v", err)
+			if err := job.Cmd.Process.Kill(); nil != err {
+				log.Printf("error killing job:\n%v", err)
+			}
 		}
 	}
 	if nil != job.Cmd.ProcessState {
