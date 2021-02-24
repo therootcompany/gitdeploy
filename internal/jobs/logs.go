@@ -62,6 +62,10 @@ func WalkLogs(runOpts *options.ServerConfig) ([]*Job, error) {
 						// don't keep all the logs in memory
 						j.Logs = []Log{}
 						j.ID = string(j.GitRef.GetRevID())
+						if nil == j.EndedAt {
+							now := time.Now()
+							j.EndedAt = &now
+						}
 						oldJobs = append(oldJobs, j)
 					}
 				}
@@ -75,9 +79,11 @@ func WalkLogs(runOpts *options.ServerConfig) ([]*Job, error) {
 					RefName:   rev[1],
 					Rev:       rev[2],
 				}
+				now := time.Now()
 				oldJobs = append(oldJobs, &Job{
-					ID:     string(hook.GetRevID()),
-					GitRef: hook,
+					ID:      string(hook.GetRevID()),
+					GitRef:  hook,
+					EndedAt: &now,
 				})
 			}
 		}
