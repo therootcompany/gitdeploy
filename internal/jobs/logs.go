@@ -117,11 +117,10 @@ func LoadLogs(runOpts *options.ServerConfig, safeID webhooks.URLSafeGitID) (*Job
 	var f *os.File = nil
 	if value, ok := Actives.Load(refID); ok {
 		j := value.(*Job)
-		f, err = openJobFile(runOpts.LogDir, j.GitRef, ".json")
-		if nil != err {
-			return nil, err
-		}
-	} else if value, ok := Recents.Load(revID); ok {
+		return j, nil
+	}
+
+	if value, ok := Recents.Load(revID); ok {
 		j := value.(*Job)
 		f, err = openJobFile(runOpts.LogDir, j.GitRef, ".json")
 		if nil != err {
