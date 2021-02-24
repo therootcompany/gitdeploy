@@ -170,32 +170,73 @@ GET  /api/admin/jobs
       "success": true,
       "jobs": [
         {
-            "job_id": "XXXXXXXXXXXX",
-            "created_at": "2020-01-01T12:30:45.999Z",
+            "id": "XXXXXXXXXXXX",
+            "_job_id": "XXXXXXXXXXXX",                   // replaced with jobs[].id
+            "started_at": "2020-01-01T12:30:45.999Z",
+            "_created_at": "2020-01-01T12:30:45.999Z",   // replaced with jobs[].ref.timestamp
             "ref": {
+                "repo_id": "github.com/example-org/example-project",
+                "timestamp": "2001-02-03T16:30:00.999Z",
                 "https_url": "https://github.com/example-org/example-project.git",
                 "ssh_url": "git@github.com:example-org/example-project.git",
-                "rev": "xxxxxxx",
-                "ref": "refs/heads/demo",
+                "rev": "abcdef7",
+                "ref": "refs/heads/master",
                 "ref_type": "branch",
                 "ref_name": "master",
                 "repo_owner": "example-org",
                 "repo_name": "example-project"
-            }
+            },
+            "ended_at": "2001-02-03T16:30:04.999Z",
+            "exit_code": 0
         }
       ]
     }
 
 POST /api/admin/jobs
-  { "job_id": "xxxx", "kill": true }
+    { "job_id": "xxxx", "kill": true }
 
-  { "success": true }
+    { "success": true }
+
+GET /api/admin/logs/{job_id}
+
+    {
+      "success": true,
+      "started_at": "2001-02-03T16:30:01.999Z",
+      "id": "github.com/org/repo#abcdef7",
+      "ref": {
+        "repo_id": "github.com/org/repo",
+        "timestamp": "2001-02-03T16:30:00.999Z",
+        "https_url": "https://github.com/org/repo.git",
+        "ssh_url": "git@github.com:org/repo.git",
+        "rev": "abcdef7",
+        "ref": "refs/heads/master",
+        "ref_type": "branch",
+        "ref_name": "master",
+        "repo_owner": "org",
+        "repo_name": "repo"
+      },
+      "ended_at": "2001-02-03T16:30:04.999Z",
+      "exit_code": 0,
+      "logs": [
+        {
+          "timestamp": "2001-02-03T16:30:02.999Z",
+          "stderr": false,
+          "text": "Cloning into '/tmp/tmp.vksS1ln6Wv/repo'...\n"
+        },
+        {
+          "timestamp": "2001-02-03T16:30:03.999Z",
+          "stderr": false,
+          "text": "Nothing to do for github.com/org/repo#master\n"
+        }
+      ]
+    }
 
 # note: see --help for how to use --promotions
 POST /api/admin/promote
-  { "clone_url": "https://...", "ref_name": "development" }
 
-  { "success": true, "promote_to": "staging" }
+    { "clone_url": "https://...", "ref_name": "development" }
+
+    { "success": true, "promote_to": "staging" }
 
 # note: each webhook is different, but the result is to run a deploy.sh
 POST /api/admin/webhooks/{github,gitea,bitbucket}
