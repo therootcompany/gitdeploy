@@ -127,7 +127,7 @@ func Stop() {
 }
 
 // All returns all jobs, including active, recent, and (TODO) historical
-func All() []*Job {
+func All(then time.Time) []*Job {
 	jobsTimersMux.Lock()
 	defer jobsTimersMux.Unlock()
 
@@ -135,6 +135,10 @@ func All() []*Job {
 
 	Pending.Range(func(key, value interface{}) bool {
 		hook := value.(*webhooks.Ref)
+		if hook.Timestamp.Sub(then) <= 0 {
+			return true
+		}
+
 		jobCopy := &Job{
 			//StartedAt: job.StartedAt,
 			ID:     string(hook.GetURLSafeRefID()),
@@ -148,6 +152,10 @@ func All() []*Job {
 
 	Actives.Range(func(key, value interface{}) bool {
 		job := value.(*Job)
+		if job.GitRef.Timestamp.Sub(then) <= 0 {
+			return true
+		}
+
 		jobCopy := &Job{
 			StartedAt: job.StartedAt,
 			ID:        string(job.GitRef.GetURLSafeRefID()),
@@ -163,6 +171,10 @@ func All() []*Job {
 
 	Recents.Range(func(key, value interface{}) bool {
 		job := value.(*Job)
+		if job.GitRef.Timestamp.Sub(then) <= 0 {
+			return true
+		}
+
 		jobCopy := &Job{
 			StartedAt: job.StartedAt,
 			ID:        string(job.GitRef.GetURLSafeRevID()),

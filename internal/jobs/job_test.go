@@ -93,7 +93,7 @@ func TestDebounce(t *testing.T) {
 	time.Sleep(debounceDelay)
 
 	var jobMatch *Job
-	all := All()
+	all := All(time.Time{})
 	for i := range all {
 		// WARN: lock value copied
 		j := all[i]
@@ -152,7 +152,7 @@ func TestDebounce(t *testing.T) {
 
 	//var j *Job
 	jobMatch = nil
-	all = All()
+	all = All(time.Time{})
 	for i := range all {
 		j := all[i]
 		//t.Logf("[TEST] B-Job[%d]: %s\n%#v\n", i, j.GitRef.Timestamp, *j.GitRef)
