@@ -3,10 +3,13 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"git.rootprojects.org/root/gitdeploy/internal/jobs"
 	"git.rootprojects.org/root/gitdeploy/internal/log"
@@ -49,6 +52,8 @@ func RouteStopped(r chi.Router, runOpts *options.ServerConfig) {
 
 		r.Route("/admin", func(r chi.Router) {
 			r.Get("/repos", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+
 				repos := []Repo{}
 
 				for _, id := range strings.Fields(runOpts.RepoList) {
@@ -87,33 +92,48 @@ func RouteStopped(r chi.Router, runOpts *options.ServerConfig) {
 					Success: true,
 					Repos:   repos,
 				}, "", "  ")
-				w.Header().Set("Content-Type", "application/json")
 				w.Write(append(b, '\n'))
 			})
 
 			r.Get("/logs/{oldID}", func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 
-				// TODO admin auth middleware
-				log.Printf("[TODO] handle AUTH (logs could be sensitive)")
+				since, httpErr := ParseSince(r.URL.Query().Get("since"))
+				if nil != httpErr {
+					w.WriteHeader(http.StatusBadRequest)
+					writeError(w, httpErr)
+					return
+				}
 
 				oldID := webhooks.URLSafeGitID(chi.URLParam(r, "oldID"))
 				// TODO add `since`
 				j, err := jobs.LoadLogs(runOpts, oldID)
 				if nil != err {
-					w.WriteHeader(404)
+					w.WriteHeader(http.StatusNotFound)
 					w.Write([]byte(
 						`{ "success": false, "error": "job log does not exist" }` + "\n",
 					))
 					return
 				}
 
+				jobCopy := *j
+				logs := []jobs.Log{}
+				for _, log := range j.Logs {
+					if log.Timestamp.Sub(since) > 0 {
+						logs = append(logs, log)
+					}
+				}
+				jobCopy.Logs = logs
+
+				// TODO admin auth middleware
+				log.Printf("[TODO] handle AUTH (logs could be sensitive)")
+
 				b, _ := json.MarshalIndent(struct {
 					Success bool `json:"success"`
 					jobs.Job
 				}{
 					Success: true,
-					Job:     *j,
+					Job:     jobCopy,
 				}, "", "  ")
 				w.Write(append(b, '\n'))
 			})
@@ -136,8 +156,16 @@ func RouteStopped(r chi.Router, runOpts *options.ServerConfig) {
 			*/
 
 			r.Get("/jobs", func(w http.ResponseWriter, r *http.Request) {
-				all := jobs.All()
+				w.Header().Set("Content-Type", "application/json")
 
+				since, httpErr := ParseSince(r.URL.Query().Get("since"))
+				if nil != httpErr {
+					w.WriteHeader(http.StatusBadRequest)
+					writeError(w, httpErr)
+					return
+				}
+
+				all := jobs.All(since)
 				b, _ := json.Marshal(struct {
 					Success bool        `json:"success"`
 					Jobs    []*jobs.Job `json:"jobs"`
@@ -149,6 +177,8 @@ func RouteStopped(r chi.Router, runOpts *options.ServerConfig) {
 			})
 
 			r.Post("/jobs", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+
 				decoder := json.NewDecoder(r.Body)
 				msg := &KillMsg{}
 				if err := decoder.Decode(msg); nil != err {
@@ -157,7 +187,6 @@ func RouteStopped(r chi.Router, runOpts *options.ServerConfig) {
 					return
 				}
 
-				w.Header().Set("Content-Type", "application/json")
 				if _, ok := jobs.Actives.Load(webhooks.URLSafeRefID(msg.JobID)); !ok {
 					if _, ok := jobs.Pending.Load(webhooks.URLSafeRefID(msg.JobID)); !ok {
 						w.Write([]byte(
@@ -225,7 +254,7 @@ func RouteStopped(r chi.Router, runOpts *options.ServerConfig) {
 				report := &Report{}
 				if err := decoder.Decode(report); nil != err {
 					w.WriteHeader(http.StatusBadRequest)
-					writeError(w, HTTPError{
+					writeError(w, &HTTPError{
 						Code:    "E_PARSE",
 						Message: "could not parse request body",
 						Detail:  err.Error(),
@@ -236,7 +265,7 @@ func RouteStopped(r chi.Router, runOpts *options.ServerConfig) {
 				jobID := webhooks.URLSafeRefID(chi.URLParam(r, "jobID"))
 				if err := jobs.SetReport(jobID, report.Report); nil != err {
 					w.WriteHeader(http.StatusInternalServerError)
-					writeError(w, HTTPError{
+					writeError(w, &HTTPError{
 						Code:    "E_SERVER",
 						Message: "could not update report",
 						Detail:  err.Error(),
@@ -254,7 +283,51 @@ func RouteStopped(r chi.Router, runOpts *options.ServerConfig) {
 
 }
 
-func writeError(w http.ResponseWriter, err HTTPError) {
+func ParseSince(sinceStr string) (time.Time, *HTTPError) {
+	if 0 == len(sinceStr) {
+		return time.Time{}, &HTTPError{
+			Code:    "E_QUERY",
+			Message: "missing query parameter '?since=' (Unix epoch seconds as float64)",
+		}
+	}
+
+	t, err := ParseUnixTime(sinceStr)
+	if nil != err {
+		return time.Time{}, &HTTPError{
+			Code:    "E_QUERY",
+			Message: "invalid query parameter '?since=' (Unix epoch seconds as float64)",
+			Detail:  err.Error(),
+		}
+	}
+
+	return t, nil
+}
+
+func ParseUnixTime(seconds string) (time.Time, error) {
+	secs, nano, err := ParseSeconds(seconds)
+	if nil != err {
+		return time.Time{}, err
+	}
+
+	return time.Unix(secs, nano), nil
+}
+
+func ParseSeconds(s string) (int64, int64, error) {
+	seconds, err := strconv.ParseFloat(s, 64)
+	if nil != err {
+		return 0.0, 0.0, err
+	}
+	secs, nanos := SecondsToInts(seconds)
+	return secs, nanos, nil
+}
+
+func SecondsToInts(seconds float64) (int64, int64) {
+	secs := math.Floor(seconds)
+	nanos := math.Round((seconds - secs) * 1000000000)
+	return int64(secs), int64(nanos)
+}
+
+func writeError(w http.ResponseWriter, err *HTTPError) {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	_ = enc.Encode(err)

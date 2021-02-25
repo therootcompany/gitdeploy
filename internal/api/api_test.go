@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -52,6 +53,19 @@ func init() {
 	//server.Close()
 }
 
+func ToUnixSeconds(t time.Time) float64 {
+	// 1614236182.651912345
+	secs := float64(t.Unix())                          // 1614236182
+	nanos := float64(t.Nanosecond()) / 1_000_000_000.0 // 0.651912345
+	//nanos := (float64(t.UnixNano()) - secs) / 1_000_000_000.0 // 0.651912345
+
+	// in my case I want to truncate the precision to milliseconds
+	nanos = math.Round((10000 * nanos) / 10000) // 0.6519
+
+	s := secs + nanos // 1614236182.651912345
+	return s
+}
+
 func TestCallback(t *testing.T) {
 	// TODO use full API request with local webhook
 	t7 := time.Now().Add(-40 * time.Second)
@@ -82,10 +96,12 @@ func TestCallback(t *testing.T) {
 	// TODO test that the API gives this back to us
 	urlRevID := hook.GetURLSafeRevID()
 
+	s := ToUnixSeconds(t7.Add(-1 * time.Second))
+
 	// TODO needs auth
-	reqURL := fmt.Sprintf("http://%s/api/admin/logs/%s",
-		runOpts.Addr,
-		string(urlRevID),
+	reqURL := fmt.Sprintf(
+		"http://%s/api/admin/logs/%s?since=%f",
+		runOpts.Addr, string(urlRevID), s,
 	)
 	resp, err := http.Get(reqURL)
 	if nil != err {

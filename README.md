@@ -164,7 +164,7 @@ GIT_REPO_TRUSTED=true
 ## API
 
 ```txt
-GET  /api/admin/jobs
+GET  /api/admin/jobs?since=1577881845.999
 
     {
       "success": true,
@@ -197,7 +197,7 @@ POST /api/admin/jobs
 
     { "success": true }
 
-GET /api/admin/logs/{job_id}
+GET /api/admin/logs/{job_id}?since=1577881845.999
 
     {
       "success": true,
