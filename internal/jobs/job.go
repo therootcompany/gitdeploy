@@ -43,19 +43,22 @@ type Job struct {
 	ExitCode  *int          `json:"exit_code,omitempty"`  // empty when running
 	// full json
 	Logs   []Log   `json:"logs,omitempty"`   // exist when requested
-	Report *Report `json:"report,omitempty"` // empty unless given
+	Report *Result `json:"report,omitempty"` // empty unless given
 	// internal only
 	cmd *exec.Cmd  `json:"-"`
 	mux sync.Mutex `json:"-"`
 }
 
-// Report should have many items
-type Report struct {
-	Name    string   `json:"name"`
-	Status  string   `json:"status,omitempty"`
-	Message string   `json:"message,omitempty"`
-	Detail  string   `json:"detail,omitempty"`
-	Results []Report `json:"results,omitempty"`
+// TODO move cmd and mux here
+// type LockingJob struct { }
+
+// Result may have many items and sub-items
+type Result struct {
+	Name    string      `json:"name"`
+	Status  string      `json:"status,omitempty"`
+	Message string      `json:"message,omitempty"`
+	Results []Result    `json:"results,omitempty"`
+	Detail  interface{} `json:"_detail,omitempty"`
 }
 
 var initialized = false
@@ -193,7 +196,7 @@ func All(then time.Time) []*Job {
 }
 
 // SetReport will update jobs' logs
-func SetReport(urlRefID webhooks.URLSafeRefID, report *Report) error {
+func SetReport(urlRefID webhooks.URLSafeRefID, result *Result) error {
 	b, err := base64.RawURLEncoding.DecodeString(string(urlRefID))
 	if nil != err {
 		return err
@@ -206,7 +209,7 @@ func SetReport(urlRefID webhooks.URLSafeRefID, report *Report) error {
 	}
 	job := value.(*Job)
 
-	job.Report = report
+	job.Report = result
 	Actives.Store(refID, job)
 
 	return nil

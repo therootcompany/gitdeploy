@@ -192,6 +192,33 @@ GET  /api/admin/jobs?since=1577881845.999
       ]
     }
 
+POST /local/jobs/{job_id}?format=gitdeploy
+
+    { "report":
+        { "name": "sleep test",
+          "status": "PASS",
+          "message": "the top level result",
+          "results": [
+            { "name": "a sub test",
+              "status": "PASS",
+              "message": "a sub group",
+              "_detail": { "foo": "bar" }
+            }
+          ]
+        }
+    }
+
+POST /local/jobs/{job_id}?format=pytest
+
+    { "exitcode": 0,
+      "root": "/home/app/srv/status.example.com/e2e-selenium",
+      "tests": [
+        { "nodeid": "pytest::idthing",
+          "outcome": "passed"
+        }
+      ]
+    }
+
 POST /api/admin/jobs
     { "job_id": "xxxx", "kill": true }
 

@@ -110,8 +110,8 @@ func TestCallback(t *testing.T) {
 	}
 
 	job := &jobs.Job{}
-	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(job); nil != err {
+	b, _ := ioutil.ReadAll(resp.Body)
+	if err := json.Unmarshal(b, job); nil != err {
 		t.Errorf(
 			"response decode error: %d %s\n%#v\n%#v",
 			resp.StatusCode, reqURL, resp.Header, err,
@@ -120,7 +120,7 @@ func TestCallback(t *testing.T) {
 	}
 
 	if len(job.Logs) < 3 {
-		t.Errorf("too few logs: %s\n%#v", reqURL, job)
+		t.Errorf("too few logs: %s\n%s\n%#v", reqURL, string(b), job)
 		return
 	}
 

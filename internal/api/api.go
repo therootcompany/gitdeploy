@@ -19,6 +19,7 @@ import (
 	"github.com/go-chi/chi"
 )
 
+// HTTPError for http errors
 type HTTPError struct {
 	Success bool   `json:"success"`
 	Code    string `json:"code,omitempty"`
@@ -26,8 +27,9 @@ type HTTPError struct {
 	Detail  string `json:"detail,omitempty"`
 }
 
-type Report struct {
-	Report *jobs.Report `json:"report"`
+// WrappedReport wraps results
+type WrappedReport struct {
+	Report jobs.Result `json:"report"`
 }
 
 // Route will set up the API and such
@@ -116,6 +118,7 @@ func RouteStopped(r chi.Router, runOpts *options.ServerConfig) {
 					return
 				}
 
+				// copies unused lock value
 				jobCopy := *j
 				logs := []jobs.Log{}
 				for _, log := range j.Logs {
@@ -250,20 +253,39 @@ func RouteStopped(r chi.Router, runOpts *options.ServerConfig) {
 			r.Post("/jobs/{jobID}", func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 
+				report := WrappedReport{}
 				decoder := json.NewDecoder(r.Body)
-				report := &Report{}
-				if err := decoder.Decode(report); nil != err {
-					w.WriteHeader(http.StatusBadRequest)
-					writeError(w, &HTTPError{
-						Code:    "E_PARSE",
-						Message: "could not parse request body",
-						Detail:  err.Error(),
-					})
-					return
+				format := r.URL.Query().Get("format")
+
+				switch format {
+				case "pytest":
+					pyresult := PyResult{}
+					if err := decoder.Decode(&pyresult); nil != err {
+						w.WriteHeader(http.StatusBadRequest)
+						writeError(w, &HTTPError{
+							Code:    "E_PARSE",
+							Message: "could not parse request body",
+							Detail:  err.Error(),
+						})
+						return
+					}
+					report = PyResultToReport(pyresult)
+				case "gitdeploy":
+					fallthrough
+				case "":
+					if err := decoder.Decode(&report); nil != err {
+						w.WriteHeader(http.StatusBadRequest)
+						writeError(w, &HTTPError{
+							Code:    "E_PARSE",
+							Message: "could not parse request body",
+							Detail:  err.Error(),
+						})
+						return
+					}
 				}
 
 				jobID := webhooks.URLSafeRefID(chi.URLParam(r, "jobID"))
-				if err := jobs.SetReport(jobID, report.Report); nil != err {
+				if err := jobs.SetReport(jobID, &report.Report); nil != err {
 					w.WriteHeader(http.StatusInternalServerError)
 					writeError(w, &HTTPError{
 						Code:    "E_SERVER",
@@ -283,6 +305,7 @@ func RouteStopped(r chi.Router, runOpts *options.ServerConfig) {
 
 }
 
+// ParseSince will parse the query string into time.Time
 func ParseSince(sinceStr string) (time.Time, *HTTPError) {
 	if 0 == len(sinceStr) {
 		return time.Time{}, &HTTPError{
@@ -303,6 +326,7 @@ func ParseSince(sinceStr string) (time.Time, *HTTPError) {
 	return t, nil
 }
 
+// ParseUnixTime turns a string of fractional seconds into time.Time
 func ParseUnixTime(seconds string) (time.Time, error) {
 	secs, nano, err := ParseSeconds(seconds)
 	if nil != err {
@@ -312,6 +336,7 @@ func ParseUnixTime(seconds string) (time.Time, error) {
 	return time.Unix(secs, nano), nil
 }
 
+// ParseSeconds turns a string of fractional seconds into Seconds and Nanoseconds
 func ParseSeconds(s string) (int64, int64, error) {
 	seconds, err := strconv.ParseFloat(s, 64)
 	if nil != err {
@@ -321,6 +346,7 @@ func ParseSeconds(s string) (int64, int64, error) {
 	return secs, nanos, nil
 }
 
+// SecondsToInts turns a float64 Second into Seconds and Nanoseconds
 func SecondsToInts(seconds float64) (int64, int64) {
 	secs := math.Floor(seconds)
 	nanos := math.Round((seconds - secs) * 1000000000)
