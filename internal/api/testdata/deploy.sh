@@ -9,7 +9,7 @@ echo "[${GIT_REPO_ID:-}#${GIT_REF_NAME:-}] Finished"
 
 echo "Reporting to '${GIT_DEPLOY_CALLBACK_URL:-}' ..."
 #curl -fsSL "${GIT_DEPLOY_CALLBACK_URL}" \
-curl -fL "${GIT_DEPLOY_CALLBACK_URL}?format=pytest" \
+curl -fsSL "${GIT_DEPLOY_CALLBACK_URL}?format=pytest" \
     -H 'Content-Type: application/json' \
     -d '
     { "exitcode": 0,
