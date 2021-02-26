@@ -117,6 +117,9 @@ func LoadLogs(runOpts *options.ServerConfig, safeID webhooks.URLSafeGitID) (*Job
 	var f *os.File = nil
 	if value, ok := Actives.Load(refID); ok {
 		j := value.(*Job)
+		j.mux.Lock()
+		j.Logs = j.Logs[:]
+		j.mux.Unlock()
 		return j, nil
 	}
 

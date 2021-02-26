@@ -89,7 +89,7 @@ func TestDebounce(t *testing.T) {
 		Repo:      "repo",
 	})
 
-	//t.Log("sleep so job can debounce and start")
+	t.Log("sleep so job can debounce and start")
 	time.Sleep(debounceDelay)
 
 	var jobMatch *Job
@@ -144,10 +144,10 @@ func TestDebounce(t *testing.T) {
 		Repo:      "repo",
 	})
 
-	//t.Log("sleep so 1st job can finish")
+	t.Log("sleep so 1st job can finish")
 	time.Sleep(jobDelay)
 	time.Sleep(jobDelay)
-	//t.Log("sleep so backlog can debounce")
+	t.Log("sleep so backlog can debounce")
 	time.Sleep(debounceDelay)
 
 	//var j *Job
@@ -176,10 +176,10 @@ func TestDebounce(t *testing.T) {
 		return
 	}
 
-	//t.Log("sleep so 2nd job can finish")
+	t.Log("sleep so 2nd job can finish")
 	time.Sleep(jobDelay)
 
-	//t.Log("sleep to ensure no more backlogs exist")
+	t.Log("sleep to ensure no more backlogs exist")
 	time.Sleep(jobDelay)
 	time.Sleep(debounceDelay)
 	time.Sleep(debounceDelay)
@@ -225,8 +225,10 @@ func TestRecents(t *testing.T) {
 	}
 	Debounce(hook)
 
-	//t.Log("sleep so job can debounce and start")
+	t.Log("sleep so job can debounce and start")
 	time.Sleep(debounceDelay)
+	time.Sleep(jobDelay)
+	t.Log("sleep so job can finish")
 	time.Sleep(jobDelay)
 
 	urlRefID := webhooks.URLSafeGitID(

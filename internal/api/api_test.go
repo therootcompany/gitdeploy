@@ -91,6 +91,8 @@ func TestCallback(t *testing.T) {
 
 	// TODO use callback or chan chan to avoid sleeps?
 	time.Sleep(debounceDelay)
+	t.Log("sleep so job can finish")
+	time.Sleep(jobDelay)
 	time.Sleep(jobDelay)
 
 	// TODO test that the API gives this back to us

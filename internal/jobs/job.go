@@ -108,7 +108,7 @@ func Run(runOpts *options.ServerConfig) {
 			run(hook, runOpts)
 		case activeID := <-deathRow:
 			//log.Printf("[%s] done", activeID)
-			remove(activeID /*, false*/)
+			remove(runOpts, activeID /*, false*/)
 		case promotion := <-Promotions:
 			log.Printf("[%s] promoting to %s", promotion.GitRef.GetRefID(), promotion.PromoteTo)
 			promote(webhooks.New(*promotion.GitRef), promotion.PromoteTo, runOpts)
@@ -464,30 +464,6 @@ func run(curHook *webhooks.Ref, runOpts *options.ServerConfig) {
 			_ = txtFile.Close()
 		}
 
-		// TODO move to deathRow only?
-		updateExitStatus(j)
-
-		// Switch ID to the more specific RevID
-		j.ID = string(j.GitRef.GetRevID())
-		// replace the text log with a json log
-		if jsonFile, err := getJobFile(runOpts.LogDir, j.GitRef, ".json"); nil != err {
-			// jsonFile.Name() should be the full path
-			log.Printf("[warn] could not create log file '%s': %v", runOpts.LogDir, err)
-		} else {
-			enc := json.NewEncoder(jsonFile)
-			enc.SetIndent("", "  ")
-			if err := enc.Encode(j); nil != err {
-				log.Printf("[warn] could not encode json log '%s': %v", jsonFile.Name(), err)
-			} else {
-				logdir, logname, _ := getJobFilePath(runOpts.LogDir, j.GitRef, ".log")
-				_ = os.Remove(filepath.Join(logdir, logname))
-			}
-			_ = jsonFile.Close()
-		}
-
-		// TODO move to deathRow only?
-		j.Logs = []Log{}
-
 		// this will completely clear the finished job
 		deathRow <- pendingID
 
@@ -542,7 +518,7 @@ func getEnvs(addr, activeID string, repoList string, hook *webhooks.Ref) []strin
 }
 
 // Remove kills the job and moves it to recents
-func remove(activeID webhooks.RefID /*, nokill bool*/) {
+func remove(runOpts *options.ServerConfig, activeID webhooks.RefID /*, nokill bool*/) {
 	// Encapsulate the whole transaction
 	jobsTimersMux.Lock()
 	defer jobsTimersMux.Unlock()
@@ -555,17 +531,6 @@ func remove(activeID webhooks.RefID /*, nokill bool*/) {
 	job := value.(*Job)
 	Actives.Delete(activeID)
 
-	// transition to RevID for non-active, non-pending jobs
-	job.ID = string(job.GitRef.GetRevID())
-	Recents.Store(job.GitRef.GetRevID(), job)
-
-	updateExitStatus(job)
-
-	// JSON should have been written to disk by this point
-	job.Logs = []Log{}
-}
-
-func updateExitStatus(job *Job) {
 	if nil == job.cmd.ProcessState {
 		// is not yet finished
 		if nil != job.cmd.Process {
@@ -582,6 +547,29 @@ func updateExitStatus(job *Job) {
 	}
 	now := time.Now()
 	job.EndedAt = &now
+
+	// Switch ID to the more specific RevID
+	job.ID = string(job.GitRef.GetRevID())
+	// replace the text log with a json log
+	if jsonFile, err := getJobFile(runOpts.LogDir, job.GitRef, ".json"); nil != err {
+		// jsonFile.Name() should be the full path
+		log.Printf("[warn] could not create log file '%s': %v", runOpts.LogDir, err)
+	} else {
+		enc := json.NewEncoder(jsonFile)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(job); nil != err {
+			log.Printf("[warn] could not encode json log '%s': %v", jsonFile.Name(), err)
+		} else {
+			logdir, logname, _ := getJobFilePath(runOpts.LogDir, job.GitRef, ".log")
+			_ = os.Remove(filepath.Join(logdir, logname))
+		}
+		_ = jsonFile.Close()
+	}
+	job.Logs = []Log{}
+
+	// transition to RevID for non-active, non-pending jobs
+	job.ID = string(job.GitRef.GetRevID())
+	Recents.Store(job.GitRef.GetRevID(), job)
 }
 
 func expire(runOpts *options.ServerConfig) {
