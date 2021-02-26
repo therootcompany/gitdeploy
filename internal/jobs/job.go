@@ -89,7 +89,10 @@ func Run(runOpts *options.ServerConfig) {
 	for i := range oldJobs {
 		job := oldJobs[i]
 		job.ID = string(job.GitRef.GetRevID())
-		Recents.Store(job.GitRef.GetRevID(), job)
+		val, ok := Recents.Load(job.GitRef.GetRevID())
+		if !ok || val.(*Job).GitRef.Timestamp.Sub(job.GitRef.Timestamp) < 0 {
+			Recents.Store(job.GitRef.GetRevID(), job)
+		}
 	}
 
 	ticker := time.NewTicker(runOpts.StaleJobAge / 2)
@@ -209,6 +212,7 @@ func SetReport(urlRefID webhooks.URLSafeRefID, result *Result) error {
 	}
 	job := value.(*Job)
 
+	// needs mutex (prevent double update)
 	job.Report = result
 	Actives.Store(refID, job)
 
