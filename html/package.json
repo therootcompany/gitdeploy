@@ -1,12 +1,11 @@
 {
-  "dependencies": {},
   "devDependencies": {
     "@babel/core": "^7.11.6",
     "@babel/preset-env": "^7.11.5",
     "@ryanburnette/html-remove-empty-lines": "^1.1.4",
     "@ryanburnette/spawn-in-parallel": "^1.0.1",
     "autoprefixer": "^8.6.5",
-    "axios": "^0.20.0",
+    "axios": "^0.21.0",
     "babel-loader": "^8.1.0",
     "bulma": "^0.9.0",
     "css-loader": "^3.5.3",
@@ -21,8 +20,8 @@
     "style-loader": "^1.2.1",
     "vue": "^2.6.12",
     "vue-router": "^3.4.3",
-    "webpack": "v5.0.0-rc.0",
-    "webpack-cli": "^3.3.12",
+    "webpack": "v5.0.0",
+    "webpack-cli": "^4.5.0",
     "webpack-merge": "^5.1.4"
   }
 }
