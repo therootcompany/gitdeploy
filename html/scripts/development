@@ -1,10 +1,9 @@
 #!/usr/bin/env node
-'use strict';
+"use strict";
 
-var spawn = require('@ryanburnette/spawn-in-parallel');
+var spawn = require("@ryanburnette/spawn-in-parallel");
 
 spawn([
-  'npx http-server dist/',
-  'npx webpack --config webpack.development.js --watch --colors',
-  'scripts/watch'
+  "npx webpack --config webpack.development.js --watch --colors",
+  "scripts/watch",
 ]);
