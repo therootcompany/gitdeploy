@@ -3,17 +3,19 @@
 var fs = require('fs');
 var path = require('path');
 var MiniCssExtractPlugin = require('mini-css-extract-plugin');
+var VueLoaderPlugin = require('vue-loader/lib/plugin');
 
 module.exports = {
-  context: path.resolve(__dirname, 'src'),
+  context: path.resolve(__dirname, './src'),
   entry: {
-    vendor: ['vue', 'vue-router', 'axios'],
+    vendor: ['vue', 'vue-router', 'axios', 'set-interval-async'],
     app: {
       import: './js/app.js',
       dependOn: 'vendor'
     }
   },
   output: {
+    // path: path.resolve(__dirname, '../public'),
     filename: `[name].js`
   },
   module: {
@@ -28,7 +30,7 @@ module.exports = {
         ]
       },
       {
-        test: /\.(js|jsx)$/,
+        test: /\.(js)$/,
         exclude: /(node_modules|bower_components)/,
         use: {
           loader: 'babel-loader',
@@ -36,19 +38,28 @@ module.exports = {
             presets: ['@babel/preset-env']
           }
         }
+      },
+      {
+        test: /\.vue$/,
+        loader: 'vue-loader'
       }
     ]
   },
   plugins: [
     new MiniCssExtractPlugin({
       filename: `style.css`
-    })
+    }),
+    new VueLoaderPlugin()
   ],
   resolve: {
     alias: {
       bulma: path.resolve(__dirname, 'node_modules/bulma'),
       axios: path.resolve(__dirname, 'node_modules/axios/dist/axios.js'),
-      vue: path.resolve(__dirname, 'node_modules/vue/dist/vue.js')
+      vue$: 'vue/dist/vue.esm.js',
+      'set-interval-async': path.resolve(
+        __dirname,
+        'node_modules/set-interval-async/dist/set-interval-async.cjs.js'
+      )
     }
   }
 };
