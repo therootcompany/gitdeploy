@@ -157,6 +157,9 @@ func main() {
 		if 0 == len(runOpts.RepoList) {
 			runOpts.RepoList = os.Getenv("TRUST_REPOS")
 		}
+		if !runOpts.TrustProxy {
+			runOpts.TrustProxy = ("TRUE" == strings.ToUpper(os.Getenv("TRUST_PROXY")))
+		}
 		if 0 == len(runOpts.LogDir) {
 			runOpts.LogDir = os.Getenv("LOG_DIR")
 		}
