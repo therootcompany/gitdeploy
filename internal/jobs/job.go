@@ -1,3 +1,4 @@
+// Package jobs controls the execution and error handling of a job
 package jobs
 
 import (
@@ -169,7 +170,8 @@ func All(then time.Time) []*Job {
 			//Promote:   job.Promote,
 		}
 		if nil != job.ExitCode {
-			jobCopy.ExitCode = &(*job.ExitCode)
+			copied := *job.ExitCode
+			jobCopy.ExitCode = &copied
 		}
 		jobsCopy = append(jobsCopy, jobCopy)
 		return true
@@ -189,7 +191,8 @@ func All(then time.Time) []*Job {
 			//Promote:   job.Promote,
 		}
 		if nil != job.ExitCode {
-			jobCopy.ExitCode = &(*job.ExitCode)
+			copied := *job.ExitCode
+			jobCopy.ExitCode = &copied
 		}
 		jobsCopy = append(jobsCopy, jobCopy)
 		return true
@@ -581,7 +584,7 @@ func expire(runOpts *options.ServerConfig) {
 
 	Recents.Range(func(key, value interface{}) bool {
 		revID := key.(webhooks.URLSafeRevID)
-		age := time.Now().Sub(value.(*Job).GitRef.Timestamp)
+		age := time.Since(value.(*Job).GitRef.Timestamp)
 		if age > runOpts.StaleJobAge {
 			staleJobIDs = append(staleJobIDs, revID)
 		}
