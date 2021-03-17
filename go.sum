@@ -1,5 +1,7 @@
 git.rootprojects.org/root/go-gitver/v2 v2.0.2 h1:T+Je13wrY1jz4OPJF98HnuCNp6n2Xe2uK6/NNF6a4+0=
 git.rootprojects.org/root/go-gitver/v2 v2.0.2/go.mod h1:ur82M/jZcvr1WWihyVtNEgDBqIjo22o56wcVHeVJFh8=
+git.rootprojects.org/root/golib v0.0.0-20210310235854-5eb35927445a h1:keo/haKfQX5i53MRolmlg1JV88vkl8clWPQz1AbscaY=
+git.rootprojects.org/root/golib v0.0.0-20210310235854-5eb35927445a/go.mod h1:Bf7Rche1u280pBLVunVK8HGrY1BvZRGT2o+R+b8v3sY=
 git.rootprojects.org/root/vfscopy v1.0.0 h1:djPpb/+4wf5DG2ZKyq6ih67JdLNGZxoIlDZddAil/LI=
 git.rootprojects.org/root/vfscopy v1.0.0/go.mod h1:fYHopt0phBfgOfuOJbLnseemp9tsPL+/kwnxtLJxlnY=
 github.com/go-chi/chi v4.1.2+incompatible h1:fGFk2Gmi/YKXk0OmGfBh0WgmN3XB8lVnEyNz34tQRec=

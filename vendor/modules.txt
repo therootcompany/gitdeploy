@@ -2,6 +2,9 @@
 ## explicit
 git.rootprojects.org/root/go-gitver/v2
 git.rootprojects.org/root/go-gitver/v2/gitver
+# git.rootprojects.org/root/golib v0.0.0-20210310235854-5eb35927445a
+## explicit
+git.rootprojects.org/root/golib/https
 # git.rootprojects.org/root/vfscopy v1.0.0
 ## explicit
 git.rootprojects.org/root/vfscopy

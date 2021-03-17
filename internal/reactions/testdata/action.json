@@ -1,0 +1,32 @@
+[
+  {
+    "matchers": [
+      {
+        "repo": "github.com/example/*",
+        "branches": ["production", "demo", "staging"],
+        "notifications": ["test_user_mailgun"],
+        "config": {
+          "emails": ["coolaj86+test@gmail.com"]
+        }
+      }
+    ],
+    "notifications": [
+      {
+        "name": "test_user_mailgun",
+        "method": "POST",
+        "url": "https://api.mailgun.net/v3/{{ index .Env \"MAILGUN_DOMAIN\" }}/messages",
+        "auth": {
+          "username": "api",
+          "password": "{{ index .Env \"MAILGUN_API_KEY\"}}"
+        },
+        "headers": {},
+        "form": {
+          "from": "{{ index .Env \"SENDER\"}}",
+          "to": "{{ with (index .Config \"emails\") }}{{range $i, $item := .}}{{if $i}},{{end}}{{$i}}{{$item}}{{end}}{{end}}",
+          "subject": "[Test] {{ .Hook.RefName }} published {{ .Report.Status }} for {{ .Hook.RepoID }}.",
+          "text": "Result: {{ .Report.Status }}\n{{ range $i, $item := .Report.Results }}{{$item.Result}}\t{{$item.Name}}\t{{$item.Message}}{{end}}"
+        }
+      }
+    ]
+  }
+]

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -250,6 +251,66 @@ func RouteStopped(r chi.Router, runOpts *options.ServerConfig) {
 
 		r.Route("/local", func(r chi.Router) {
 
+			r.Use(func(next http.Handler) http.Handler {
+				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					// r.Body is always .Close()ed by Go's http server
+					r.Body = http.MaxBytesReader(w, r.Body, options.DefaultMaxBodySize)
+
+					// all strings
+					//host := r.Host it's fine if this is a domain, as long as the IP is local
+					addr := r.RemoteAddr
+					xff := r.Header.Get("X-Forwarded-For")
+
+					// TODO TRUST_IPS=192.168.0.0/24,
+					locals := []string{
+						// IMPORTANT: in lexically sorted order
+						"0:0:0:0:0:0:0:1", "127.0.0.1", "::1", "::ffff:127.0.0.1", "::ffff:7f00:1", "localhost",
+					}
+					if !(IsAllowedHost(addr, locals) && IsAllowedHost(xff, locals)) {
+						w.Header().Set("Content-Type", "application/json")
+						w.WriteHeader(http.StatusBadRequest)
+						writeError(w, &HTTPError{
+							Code:    "E_ADDR",
+							Message: "ip address is not on the trusted list",
+						})
+						return
+					}
+
+					next.ServeHTTP(w, r)
+				})
+			})
+
+			r.Post("/webhook", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+
+				decoder := json.NewDecoder(r.Body)
+				hook := &webhooks.Ref{}
+				if err := decoder.Decode(hook); nil != err {
+					w.WriteHeader(http.StatusBadRequest)
+					writeError(w, &HTTPError{
+						Code:    "E_PARSE",
+						Message: "could not parse request body",
+						Detail:  err.Error(),
+					})
+					return
+				}
+
+				hook = webhooks.New(*hook)
+				if len(hook.Rev) < 7 || 0 == len(hook.RefName) ||
+					0 == len(hook.Owner) || 0 == len(hook.Repo) {
+					w.WriteHeader(http.StatusBadRequest)
+					writeError(w, &HTTPError{
+						Code:    "E_MISSING",
+						Message: "one of 'rev', 'ref_name', 'repo_name', or 'repo_owner' was missing or too short",
+					})
+					return
+				}
+
+				webhooks.Hook(*hook)
+
+				w.Write([]byte(`{ "success": true }` + "\n"))
+			})
+
 			r.Post("/jobs/{jobID}", func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 
@@ -303,6 +364,38 @@ func RouteStopped(r chi.Router, runOpts *options.ServerConfig) {
 
 	})
 
+}
+
+// IsAllowedHost checks that the hostname or IP address is localhost
+func IsAllowedHost(hosts string, allowed []string) bool {
+	// for X-Forwarded-For, which may be comma-delimited
+	for _, host := range strings.Split(hosts, ",") {
+		host = strings.TrimSpace(host)
+		if 0 == len(host) {
+			continue
+		}
+
+		// ipv6 (port stripped)
+		if '[' == host[0] {
+			// [xxxx:xxxx]:80 => xxxx:xxxx
+			host = strings.Split(host, "]")[0][1:]
+		}
+
+		// strip port number (ipv4 only)
+		if lastColon := strings.LastIndex(host, ":"); lastColon >= 0 && 1 == strings.Count(host, ":") {
+			host = host[:lastColon]
+		}
+
+		found := sort.Search(len(allowed), func(i int) bool {
+			return host == allowed[i]
+		})
+
+		if found < 0 {
+			return false
+		}
+	}
+
+	return true
 }
 
 // ParseSince will parse the query string into time.Time
