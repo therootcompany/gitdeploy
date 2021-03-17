@@ -1,3 +1,4 @@
+// Package webhooks provides the data structures and utilities related to the hooks
 package webhooks
 
 import (
@@ -61,7 +62,11 @@ func New(r Ref) *Ref {
 
 // String prints object as git.example.com#branch@rev
 func (h *Ref) String() string {
-	return string(h.GetRefID()) + "@" + h.Rev[:7]
+	rev := h.Rev
+	if len(rev) > 7 {
+		rev = rev[:7]
+	}
+	return string(h.GetRefID()) + "@" + rev
 }
 
 // GetRefID returns a unique reference like "github.com/org/project#branch"
@@ -80,7 +85,11 @@ func (h *Ref) GetURLSafeRefID() URLSafeRefID {
 
 // GetRevID returns a unique reference like "github.com/org/project#abcd7890"
 func (h *Ref) GetRevID() RevID {
-	return RevID(h.RepoID + "#" + h.Rev)
+	rev := h.Rev
+	if len(rev) > 7 {
+		rev = rev[:7]
+	}
+	return RevID(h.RepoID + "#" + rev)
 }
 
 // GetURLSafeRevID returns the URL-safe Base64 encoding of the RevID
