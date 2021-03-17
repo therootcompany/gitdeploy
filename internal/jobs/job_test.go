@@ -240,13 +240,12 @@ func TestRecents(t *testing.T) {
 		urlRevID := webhooks.URLSafeGitID(
 			base64.RawURLEncoding.EncodeToString([]byte(hook.GetRevID())),
 		)
-		//lint:ignore SA4006 The linter is wrong, j is used
+
 		j, err = LoadLogs(runOpts, urlRevID)
 		if nil != err {
 			t.Errorf("error loading logs: %v", err)
 			return
 		}
-		return
 	}
 
 	if len(j.Logs) < 3 {

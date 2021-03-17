@@ -461,7 +461,6 @@ func run(curHook *webhooks.Ref, runOpts *options.ServerConfig) {
 	Actives.Store(pendingID, j)
 
 	go func() {
-		// TODO make configurable
 		timer := time.AfterFunc(runOpts.DefaultMaxJobTime, func() {
 			if nil == cmd.Process {
 				log.Printf("[SANITY] [%s] never exited, but does not exist", pendingID)
