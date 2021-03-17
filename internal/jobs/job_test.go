@@ -22,14 +22,15 @@ var t0 = time.Now().UTC()
 func init() {
 	tmpDir, _ := ioutil.TempDir("", "gitdeploy-*")
 	runOpts = &options.ServerConfig{
-		Addr:          "localhost:4483",
-		ScriptsPath:   "./testdata",
-		LogDir:        "./test-logs/debounce",
-		TmpDir:        tmpDir,
-		DebounceDelay: 25 * time.Millisecond,
-		StaleJobAge:   5 * time.Minute,
-		StaleLogAge:   5 * time.Minute,
-		ExpiredLogAge: 10 * time.Minute,
+		Addr:              "localhost:4483",
+		ScriptsPath:       "./testdata",
+		LogDir:            "./test-logs/debounce",
+		TmpDir:            tmpDir,
+		DebounceDelay:     25 * time.Millisecond,
+		DefaultMaxJobTime: 5 * time.Second, // very short
+		StaleJobAge:       5 * time.Minute,
+		StaleLogAge:       5 * time.Minute,
+		ExpiredLogAge:     10 * time.Minute,
 	}
 	logDir, _ = filepath.Abs(runOpts.LogDir)
 
@@ -239,6 +240,7 @@ func TestRecents(t *testing.T) {
 		urlRevID := webhooks.URLSafeGitID(
 			base64.RawURLEncoding.EncodeToString([]byte(hook.GetRevID())),
 		)
+		//lint:ignore SA4006 The linter is wrong, j is used
 		j, err = LoadLogs(runOpts, urlRevID)
 		if nil != err {
 			t.Errorf("error loading logs: %v", err)

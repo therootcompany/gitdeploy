@@ -10,19 +10,20 @@ var Server *ServerConfig
 
 // ServerConfig is an options struct
 type ServerConfig struct {
-	Addr          string
-	TrustProxy    bool
-	RepoList      string
-	Compress      bool
-	ServePath     string
-	ScriptsPath   string
-	Promotions    []string
-	LogDir        string // where the job logs should go
-	TmpDir        string // where the backlog files go
-	DebounceDelay time.Duration
-	StaleJobAge   time.Duration // how old a dead job is before it's stale
-	StaleLogAge   time.Duration
-	ExpiredLogAge time.Duration
+	Addr              string
+	TrustProxy        bool
+	RepoList          string
+	Compress          bool
+	ServePath         string
+	ScriptsPath       string
+	Promotions        []string
+	LogDir            string // where the job logs should go
+	TmpDir            string // where the backlog files go
+	DebounceDelay     time.Duration
+	DefaultMaxJobTime time.Duration
+	StaleJobAge       time.Duration // how old a dead job is before it's stale
+	StaleLogAge       time.Duration
+	ExpiredLogAge     time.Duration
 	// TODO use BacklogDir instead?
 }
 

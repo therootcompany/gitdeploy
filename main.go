@@ -48,7 +48,6 @@ func ver() string {
 var runOpts *options.ServerConfig
 var runFlags *flag.FlagSet
 var initFlags *flag.FlagSet
-var promotions []string
 var promotionList string
 var defaultPromotionList = "production,staging,master"
 var oldScripts string
@@ -172,6 +171,9 @@ func main() {
 				return
 			}
 			log.Printf("TEMP_DIR=%s", runOpts.TmpDir)
+		}
+		if 0 == runOpts.DefaultMaxJobTime {
+			runOpts.DefaultMaxJobTime = 10 * time.Minute
 		}
 		if 0 == runOpts.DebounceDelay {
 			runOpts.DebounceDelay = 5 * time.Second

@@ -29,13 +29,14 @@ func init() {
 	tmpDir, _ := ioutil.TempDir("", "gitdeploy-*")
 	runOpts = &options.ServerConfig{
 		//Addr:          "localhost:4483",
-		ScriptsPath:   "./testdata",
-		LogDir:        "./test-logs/api",
-		TmpDir:        tmpDir,
-		DebounceDelay: 25 * time.Millisecond,
-		StaleJobAge:   5 * time.Minute,
-		StaleLogAge:   5 * time.Minute,
-		ExpiredLogAge: 10 * time.Minute,
+		ScriptsPath:       "./testdata",
+		LogDir:            "./test-logs/api",
+		TmpDir:            tmpDir,
+		DebounceDelay:     25 * time.Millisecond,
+		DefaultMaxJobTime: 5 * time.Second, // very short
+		StaleJobAge:       5 * time.Minute,
+		StaleLogAge:       5 * time.Minute,
+		ExpiredLogAge:     10 * time.Minute,
 	}
 	logDir, _ = filepath.Abs(runOpts.LogDir)
 

@@ -461,12 +461,25 @@ func run(curHook *webhooks.Ref, runOpts *options.ServerConfig) {
 	Actives.Store(pendingID, j)
 
 	go func() {
+		// TODO make configurable
+		timer := time.AfterFunc(runOpts.DefaultMaxJobTime, func() {
+			if nil == cmd.Process {
+				log.Printf("[SANITY] [%s] never exited, but does not exist", pendingID)
+			}
+			if err := cmd.Process.Kill(); nil != err {
+				log.Printf("[%s] failed to kill process: %v", pendingID, err)
+			}
+			//deathRow <- pendingID
+		})
+
 		//log.Printf("[%s] job started", pendingID)
 		if err := cmd.Wait(); nil != err {
 			log.Printf("[%s] exited with error: %v", pendingID, err)
 		} else {
 			log.Printf("[%s] exited successfully", pendingID)
 		}
+		_ = timer.Stop()
+
 		if nil != txtFile {
 			_ = txtFile.Close()
 		}
