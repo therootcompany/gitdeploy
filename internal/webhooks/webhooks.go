@@ -173,6 +173,20 @@ func getRepoID(url string) string {
 	repoID := strings.TrimPrefix(url, "https://")
 	repoID = strings.TrimPrefix(repoID, "http://")
 	repoID = strings.TrimPrefix(repoID, "ssh://")
+
+	// "gitea@example.com:my-org/my-project" // removes gitea@
+	// "git/ea@example.com:my-org/my-project" // no change
+	// "gitea@" // empty string
+	firstSlash := strings.Index(repoID, "/")
+	firstAt := strings.Index(repoID, "@")
+	if firstSlash < 0 {
+		firstSlash = 999999
+	}
+	if firstAt >= 0 && firstAt < firstSlash && len(repoID) >= firstAt {
+		repoID = repoID[firstAt+1:]
+		repoID = strings.Replace(repoID, ":", "/", 1)
+	}
+
 	repoID = strings.TrimSuffix(repoID, ".git")
 	return repoID
 }
