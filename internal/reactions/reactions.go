@@ -4,13 +4,12 @@ package reactions
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 	"text/template"
-
-	"git.rootprojects.org/root/gitdeploy/internal/jobs"
 
 	"git.rootprojects.org/root/golib/https"
 )
@@ -46,15 +45,24 @@ type Target struct {
 	Env []string `json:"-"`
 }
 
-func Do(h Notification, report *jobs.Result) error {
-	body, err := encodeBody(h, report)
+func Do(h Notification, data interface{}) error {
+	body, err := encodeBody(h, data)
 	if nil != err {
 		return err
 	}
-	b := strings.NewReader(body)
+	r := strings.NewReader(body)
 
+	return doRequest(h, data, r)
+}
+
+func doRequest(h Notification, data interface{}, body io.Reader) error {
 	client := https.NewHTTPClient()
-	req, err := http.NewRequest(h.Method, h.URL, b)
+	url, err := doTmpl("notification-url", "URL", h.URL, data)
+	if nil != err {
+		return err
+	}
+
+	req, err := http.NewRequest(h.Method, url, body)
 	if nil != err {
 		return err
 	}
@@ -70,10 +78,20 @@ func Do(h Notification, report *jobs.Result) error {
 		if "" == user {
 			user = h.Auth["username"]
 		}
+		user, err = doTmpl("notification-basic-username", "username", user, data)
+		if nil != err {
+			return err
+		}
+
 		pass := h.Auth["pass"]
-		if "" == user {
+		if "" == pass {
 			pass = h.Auth["password"]
 		}
+		pass, err = doTmpl("notification-basic-username", "username", pass, data)
+		if nil != err {
+			return err
+		}
+
 		req.SetBasicAuth(user, pass)
 	}
 
@@ -92,15 +110,31 @@ func Do(h Notification, report *jobs.Result) error {
 	}
 
 	// TODO json vs xml vs txt
-	var data map[string]interface{}
+	var result map[string]interface{}
 	req.Header.Add("Accept", "application/json")
 	decoder := json.NewDecoder(resp.Body)
-	err = decoder.Decode(&data)
+	err = decoder.Decode(&result)
 	if err != nil {
 		return fmt.Errorf("response body error for '%s': %s: %v", h.Name, resp.Status, err)
 	}
 
+	fmt.Printf("\n%#v\n", result)
+
 	return nil
+}
+
+func doTmpl(name, short, tmpl string, data interface{}) (string, error) {
+	t, err := template.New(name).Parse(tmpl)
+	if nil != err {
+		return "", fmt.Errorf("error parsing "+short+"template: %v\n%q\n", err, tmpl)
+	}
+	t = t.Option("missingkey=default")
+	// strings.Builder{} is like a one-directional bytes.Buffer
+	var w strings.Builder
+	if err := t.Execute(&w, data); nil != err {
+		return "", fmt.Errorf("error executing "+short+" template: %v\n", err)
+	}
+	return w.String(), nil
 }
 
 func encodeBody(h Notification, data interface{}) (string, error) {

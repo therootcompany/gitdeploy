@@ -22,9 +22,9 @@
         "headers": {},
         "form": {
           "from": "{{ index .Env \"SENDER\"}}",
-          "to": "{{ with (index .Config \"emails\") }}{{range $i, $item := .}}{{if $i}},{{end}}{{$i}}{{$item}}{{end}}{{end}}",
+          "to": "{{ with (index .Config \"emails\") }}{{range $i, $item := .}}{{if $i}},{{end}}{{$item}}{{end}}{{end}}",
           "subject": "[Test] {{ .Hook.RefName }} published {{ .Report.Status }} for {{ .Hook.RepoID }}.",
-          "text": "Result: {{ .Report.Status }}\n{{ range $i, $item := .Report.Results }}{{$item.Result}}\t{{$item.Name}}\t{{$item.Message}}{{end}}"
+          "text": "Result: {{ .Report.Status }}\n{{ range $i, $item := .Report.Results }}{{$item.Status}}\t{{$item.Name}}\t{{$item.Message}}\n{{end}}"
         }
       }
     ]

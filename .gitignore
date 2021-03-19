@@ -5,6 +5,7 @@
 /git-deploy
 *.env
 .env
+.env.*
 
 test-logs
 node_modules/

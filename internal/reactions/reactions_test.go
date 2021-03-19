@@ -66,7 +66,7 @@ func TestMailgun(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	fmt.Printf("\n%#v\n\n", *config)
+	//fmt.Printf("\n[DEBUG]\n%#v\n\n", *config)
 
 	j := &jobs.Job{
 		GitRef: webhooks.New(webhooks.Ref{
@@ -75,18 +75,38 @@ func TestMailgun(t *testing.T) {
 		}),
 		Report: &jobs.Result{
 			Status: "bar",
+			Results: []jobs.Result{
+				jobs.Result{
+					Name:   "Test 1",
+					Status: "pass",
+				},
+				jobs.Result{
+					Name:    "Test 2",
+					Status:  "fail",
+					Message: "didn't do well",
+				},
+			},
 		},
 	}
-	body, err := encodeBody((*config)[0].Notifications[0], Renderable{
+
+	h := (*config)[0].Notifications[0]
+	report := Renderable{
 		//Config: (*config)[0].Notifications[0].Config,
 		Config: (*config)[0].Matchers[0].Config,
 		Env:    parseEnv(os.Environ()),
 		Hook:   j.GitRef,
 		Report: j.Report,
-	})
+	}
+
+	body, err := encodeBody(h, report)
 	if nil != err {
 		fmt.Printf("%v\n", err)
 	}
+	r := strings.NewReader(body)
 
 	fmt.Printf("%s\n", body)
+	if err := doRequest(h, report, r); nil != err {
+		t.Error(err)
+		return
+	}
 }
