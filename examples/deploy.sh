@@ -1,30 +1,30 @@
-#!/bin/bash
+#!/bin/sh
 
 # The directory of this bash script
 base_dir="$(dirname "$(readlink -f "$0")")"
 
-function deploy_local() {
+deploy_local() { (
     echo "Running deploy script for ${GIT_REPO_ID}"
     bash -o errexit -o nounset "${base_dir}/${GIT_REPO_ID}/deploy.sh"
-}
+); }
 
-function deploy_trusted() {
+deploy_trusted() { (
     my_tmp="$(mktemp -d -t "tmp.XXXXXXXXXX")"
     git clone --depth=1 "${GIT_CLONE_URL}" -b "${GIT_REF_NAME}" "${my_tmp}/${GIT_REPO_NAME}"
 
-    pushd "${my_tmp}/${GIT_REPO_NAME}"
-        if [[ -f ".gitdeploy/deploy.sh" ]]
-        then
+    (
+        cd "${my_tmp}/${GIT_REPO_NAME}" || return 1
+        if test -s ".gitdeploy/deploy.sh"; then
             bash -o errexit -o nounset ".gitdeploy/deploy.sh"
         else
             echo "Missing ${GIT_REPO_ID}/.gitdeploy/deploy.sh"
         fi
-    popd
+    )
 
-    rm -rf "${my_tmp}/${GIT_REPO_NAME}/"
-}
+    rm -rf "${my_tmp:?}/${GIT_REPO_NAME}/"
+); }
 
-function show_help() {
+show_help() { (
     echo ""
     echo "Nothing to do for ${GIT_REPO_ID}"
     echo ""
@@ -41,25 +41,21 @@ function show_help() {
     echo "You can use any of these ENVs in your deploy script:"
 
     # These environment variables are set by the caller
-    my_envs='GIT_REPO_ID
-    GIT_CLONE_URL
-    GIT_REPO_OWNER
-    GIT_REPO_NAME
-    GIT_REF_TYPE
-    GIT_REF_NAME
-    GIT_REPO_TRUSTED
-    '
-    for x in $my_envs; do
-        echo "$x=${!x}"
-    done
+    echo "GIT_REPO_ID='$GIT_REPO_ID'"
+    echo "GIT_CLONE_URL='$GIT_CLONE_URL'"
+    echo "GIT_REPO_OWNER='$GIT_REPO_OWNER'"
+    echo "GIT_REPO_NAME='$GIT_REPO_NAME'"
+    echo "GIT_REF_TYPE='$GIT_REF_TYPE'"
+    echo "GIT_REF_NAME='$GIT_REF_NAME'"
+    echo "GIT_REPO_TRUSTED='$GIT_REPO_TRUSTED'"
 
     sleep 1
-}
+); }
 
-if [[ -f "${base_dir}/${GIT_REPO_ID}/deploy.sh" ]]; then
+if test -f "${base_dir}/${GIT_REPO_ID}/deploy.sh"; then
     deploy_local
     exit 0
-elif [[ "true" == "${GIT_REPO_TRUSTED}" ]]; then
+elif test "true" = "${GIT_REPO_TRUSTED}"; then
     deploy_trusted
     exit 0
 else
